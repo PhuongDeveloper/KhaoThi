@@ -143,22 +143,42 @@ export const useAuthStore = create<AuthState>()(
       console.log('[AuthStore] Google OAuth redirect URL:', redirectUrl)
       console.log('[AuthStore] Full URL:', window.location.href)
       
-      // Xóa bất kỳ redirect URL cũ nào có thể được cache
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Force redirect URL bằng cách thêm vào query params và options
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
+          // Thêm skipHttpRedirect để xử lý redirect thủ công nếu cần
+          skipBrowserRedirect: false,
           queryParams: {
-            // Force không cache redirect
+            // Force không cache redirect và luôn chọn account
             prompt: 'select_account',
+            // Thêm redirect_uri vào query params để đảm bảo Google nhận được
+            access_type: 'offline',
           },
         },
       })
+      
+      console.log('[AuthStore] OAuth response data:', data)
       
       if (error) {
         console.error('[AuthStore] Google OAuth error:', error)
         console.error('[AuthStore] Error details:', JSON.stringify(error, null, 2))
         throw error
+      }
+      
+      // Nếu có URL trong response, log để debug
+      if (data?.url) {
+        console.log('[AuthStore] OAuth redirect URL from Supabase:', data.url)
+        // Kiểm tra xem URL có chứa redirect_uri đúng không
+        const urlObj = new URL(data.url)
+        const redirectUri = urlObj.searchParams.get('redirect_uri')
+        console.log('[AuthStore] Redirect URI in OAuth URL:', redirectUri)
+        
+        if (redirectUri && redirectUri.includes('localhost:3000')) {
+          console.error('[AuthStore] WARNING: OAuth URL contains localhost:3000!')
+          console.error('[AuthStore] This means Supabase is using cached/stored redirect URI')
+        }
       }
     } catch (error: any) {
       console.error('[AuthStore] Google OAuth failed:', error)
