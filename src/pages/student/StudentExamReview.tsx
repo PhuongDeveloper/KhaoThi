@@ -69,7 +69,7 @@ export default function StudentExamReview() {
       setCanReview(true)
       return true
     } catch (error: any) {
-      console.error('Error checking review permission:', error)
+      // Ignore errors
       // Nếu có lỗi, vẫn cho phép xem (fallback)
       setCanReview(true)
       return true

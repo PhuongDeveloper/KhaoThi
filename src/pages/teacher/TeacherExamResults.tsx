@@ -44,8 +44,8 @@ export default function TeacherExamResults() {
       if (attemptsData.length > 0 && questionsData.length > 0) {
         calculateQuestionStats(questionsData, attemptsData).then(stats => {
           setQuestionStats(stats)
-        }).catch(err => {
-          console.error('Error calculating question stats:', err)
+        }).catch(() => {
+          // Ignore errors
         })
       }
     } catch (error: any) {
@@ -207,7 +207,7 @@ export default function TeacherExamResults() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                label={({ name, value, percent }: { name: string; value: number; percent: number }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"

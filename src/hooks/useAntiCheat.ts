@@ -63,7 +63,7 @@ export function useAntiCheat(options: UseAntiCheatOptions = {}) {
             .eq('id', attemptId)
         }
       } catch (error) {
-        console.error('Error saving violation:', error)
+        // Ignore errors
       }
     }
 
@@ -248,7 +248,7 @@ export function useAntiCheat(options: UseAntiCheatOptions = {}) {
         await (element as any).msRequestFullscreen()
       }
     } catch (error) {
-      console.error('Error requesting fullscreen:', error)
+      // Ignore errors
     }
   }
 

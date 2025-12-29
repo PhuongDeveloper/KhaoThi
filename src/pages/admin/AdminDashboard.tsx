@@ -30,7 +30,7 @@ export default function AdminDashboard() {
           examsResult = { count: exams.count }
         }
       } catch (e) {
-        console.warn('Error fetching exams count:', e)
+        // Ignore errors
       }
       
       try {
@@ -39,7 +39,7 @@ export default function AdminDashboard() {
           attemptsResult = { count: attempts.count }
         }
       } catch (e) {
-        console.warn('Error fetching attempts count:', e)
+        // Ignore errors
       }
 
       setStats({
@@ -49,7 +49,7 @@ export default function AdminDashboard() {
         attempts: attemptsResult.count || 0,
       })
     } catch (error) {
-      console.error('Error fetching stats:', error)
+      // Ignore errors
       setStats({
         users: 0,
         subjects: 0,

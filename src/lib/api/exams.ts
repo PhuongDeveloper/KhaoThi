@@ -68,7 +68,7 @@ export const examApi = {
           })
         }
       } catch (e) {
-        console.warn('Error fetching subjects:', e)
+        // Ignore errors
       }
     }
 
@@ -85,7 +85,7 @@ export const examApi = {
           })
         }
       } catch (e) {
-        console.warn('Error fetching profiles:', e)
+        // Ignore errors
       }
     }
 
@@ -463,9 +463,8 @@ export const examApi = {
         }
       })
     } catch (e: any) {
-      // Cột start_time/end_time chưa tồn tại, bỏ qua
       if (e.message?.includes('start_time') || e.message?.includes('end_time')) {
-        console.warn('start_time/end_time columns may not exist yet, using exam times instead')
+        // Ignore - columns may not exist yet
       } else {
         throw e
       }
@@ -521,7 +520,7 @@ export const examApi = {
 
         results.push(attempt.id)
       } catch (err) {
-        console.error(`Error auto-submitting attempt ${attempt.id}:`, err)
+        // Ignore errors
       }
     }
 
@@ -529,45 +528,31 @@ export const examApi = {
   },
 
   async getAssignedExams(studentId?: string, useCache = true) {
-    console.log('[API] getAssignedExams() called, studentId:', studentId, 'useCache:', useCache)
-    const startTime = Date.now()
     const { data: { user } } = await supabase.auth.getUser()
     const currentStudentId = studentId || user?.id
 
     if (!currentStudentId) {
-      console.log('[API] No studentId, returning empty array')
       return []
     }
 
-    // Kiểm tra cache trước
     if (useCache) {
       const cached = cache.get<any[]>(CACHE_KEYS.assignedExams(currentStudentId))
       if (cached) {
-        const duration = Date.now() - startTime
-        console.log(`[API] getAssignedExams() returned from cache in ${duration}ms, count:`, cached.length)
         return cached
       }
-      console.log('[API] No cache hit for assigned exams')
     }
 
-    // Query đơn giản nhất - chỉ lấy assignments (không select start_time/end_time để tránh lỗi nếu cột chưa tồn tại)
-    console.log('[API] Querying exam_assignments...')
-    const queryStartTime = Date.now()
     const { data: assignments, error } = await supabase
       .from('exam_assignments')
       .select('id, exam_id, student_id, assigned_at')
       .eq('student_id', currentStudentId)
       .order('assigned_at', { ascending: false })
-      .limit(20) // Giới hạn số lượng để nhanh hơn
-    const queryDuration = Date.now() - queryStartTime
-    console.log(`[API] exam_assignments query completed in ${queryDuration}ms, count:`, assignments?.length || 0)
+      .limit(20)
 
     if (error) {
-      console.error('[API] Error querying exam_assignments:', error)
       throw error
     }
     if (!assignments || assignments.length === 0) {
-      console.log('[API] No assignments found')
       return []
     }
 
@@ -650,7 +635,7 @@ export const examApi = {
       } catch (e: any) {
         // Cột chưa tồn tại, bỏ qua và dùng thời gian từ exam
         if (e.message?.includes('start_time') || e.message?.includes('end_time') || e.message?.includes('column')) {
-          console.warn('start_time/end_time columns may not exist yet, using exam times instead')
+          // Ignore - columns may not exist yet
         }
       }
     }
@@ -863,7 +848,6 @@ export const examApi = {
         .single()
 
       if (error) {
-        console.error('Error updating response:', error)
         throw error
       }
       return data as ExamResponse
@@ -882,7 +866,6 @@ export const examApi = {
         .single()
 
       if (error) {
-        console.error('Error inserting response:', error)
         throw error
       }
       return data as ExamResponse
@@ -1026,37 +1009,27 @@ export const examApi = {
       if (cached) return cached
     }
 
-    // Query đơn giản - chỉ lấy những field cần thiết
-    console.log('[API] Querying exam_attempts...')
-    const queryStartTime = Date.now()
     let query = supabase
       .from('exam_attempts')
       .select('id, exam_id, student_id, status, score, percentage, time_spent_seconds, created_at, submitted_at, violations_count, violations_data')
       .order('created_at', { ascending: false })
 
-    // Nếu là admin hoặc teacher và có examId, lấy tất cả attempts của bài thi đó
-    // Nếu không, chỉ lấy attempts của chính user đó
     if (examId && (userRole === 'admin' || userRole === 'teacher')) {
       query = query.eq('exam_id', examId)
-      // Không giới hạn số lượng cho admin/teacher xem kết quả bài thi
     } else {
       query = query.eq('student_id', user.id)
     if (examId) {
       query = query.eq('exam_id', examId)
       }
-      query = query.limit(50) // Giới hạn số lượng cho student
+      query = query.limit(50)
     }
 
     const { data: attempts, error } = await query
-    const queryDuration = Date.now() - queryStartTime
-    console.log(`[API] exam_attempts query completed in ${queryDuration}ms, count:`, attempts?.length || 0)
     
     if (error) {
-      console.error('[API] Error querying exam_attempts:', error)
       throw error
     }
     if (!attempts || attempts.length === 0) {
-      console.log('[API] No attempts found')
       return []
     }
 

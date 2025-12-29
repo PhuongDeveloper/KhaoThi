@@ -37,7 +37,7 @@ export default function TeacherDashboard() {
 
       setRecentExams(myExams.slice(0, 5))
     } catch (error) {
-      console.error('Error fetching data:', error)
+      // Ignore errors
     } finally {
       setLoading(false)
     }

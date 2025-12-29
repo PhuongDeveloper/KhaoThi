@@ -37,21 +37,17 @@ export default function StudentExams() {
             filter: `student_id=eq.${profile.id}`,
           },
           () => {
-            console.log('[StudentExams] Assignment changed, refreshing...')
             cache.invalidate(CACHE_KEYS.assignedExams(profile.id))
             fetchExams()
           }
         )
         .subscribe()
 
-      // Auto-refresh mỗi 30 giây
       const refreshInterval = setInterval(() => {
-        console.log('[StudentExams] Auto-refreshing...')
         fetchExams()
       }, 30000)
 
       return () => {
-        console.log('[StudentExams] Cleaning up subscriptions')
         supabase.removeChannel(channel)
         clearInterval(refreshInterval)
       }

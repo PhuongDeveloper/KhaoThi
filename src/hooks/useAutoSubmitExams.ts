@@ -5,11 +5,11 @@ import { examApi } from '../lib/api/exams'
 export function useAutoSubmitExams(interval: number = 60000) {
   useEffect(() => {
     // Gọi ngay lập tức
-    examApi.autoSubmitExpiredAttempts().catch(console.error)
+    examApi.autoSubmitExpiredAttempts().catch(() => {})
 
     // Gọi định kỳ
     const timer = setInterval(() => {
-      examApi.autoSubmitExpiredAttempts().catch(console.error)
+      examApi.autoSubmitExpiredAttempts().catch(() => {})
     }, interval)
 
     return () => clearInterval(timer)

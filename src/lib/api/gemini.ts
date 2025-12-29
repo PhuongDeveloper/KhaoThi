@@ -57,7 +57,6 @@ async function checkApiLimit(teacherId: string): Promise<boolean> {
     .lte('created_at', `${today}T23:59:59.999Z`)
 
   if (error) {
-    console.error('Error checking API limit:', error)
     return false
   }
 
@@ -222,7 +221,6 @@ Chỉ trả về JSON, không có text thêm.`
 
     return questions
   } catch (error) {
-    console.error('Error analyzing file:', error)
     throw error
   }
 }
@@ -359,7 +357,6 @@ Chỉ trả về JSON, không có text thêm.`
 
     return answers
   } catch (error) {
-    console.error('Error auto calculating answers:', error)
     throw error
   }
 }
@@ -456,7 +453,6 @@ Chỉ trả về JSON, không có text thêm.`
 
     return questions
   } catch (error) {
-    console.error('Error generating questions:', error)
     throw error
   }
 }
@@ -541,7 +537,6 @@ Chỉ trả về JSON, không có text thêm.`
 
     return analysis
   } catch (error) {
-    console.error('Error analyzing exam results:', error)
     throw error
   }
 }

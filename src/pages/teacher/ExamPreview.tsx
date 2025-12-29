@@ -128,7 +128,7 @@ export default function ExamPreview() {
         setStartTime(new Date())
       } catch (error: any) {
         toast.error('Lỗi khi khởi tạo preview. Vui lòng thử lại.')
-        console.error(error)
+        // Ignore errors
       }
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi khởi tạo bài thi')
@@ -145,7 +145,7 @@ export default function ExamPreview() {
       try {
         await examApi.submitResponse(attempt.id, questionId, answerId)
       } catch (error) {
-        console.error('Error saving response:', error)
+        // Ignore errors
       }
     }
   }
@@ -158,7 +158,7 @@ export default function ExamPreview() {
       try {
         await examApi.submitResponse(attempt.id, questionId, answerId, value)
       } catch (error) {
-        console.error('Error saving true/false response:', error)
+        // Ignore errors
       }
     }
   }
@@ -171,7 +171,7 @@ export default function ExamPreview() {
       try {
         await examApi.submitResponse(attempt.id, questionId, null, textAnswer)
       } catch (error) {
-        console.error('Error saving short answer:', error)
+        // Ignore errors
       }
     }
   }

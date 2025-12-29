@@ -68,53 +68,28 @@
         // Production URL - có thể thay đổi nếu cần
         const PRODUCTION_URL = 'https://www.hethongthi.online';
         
-        // Function để fix redirect về localhost
         function fixLocalhostRedirect() {
           const currentOrigin = window.location.origin;
-          const currentHref = window.location.href;
           
-          // Nếu detect redirect về localhost, fix ngay lập tức
           if (currentOrigin.includes('localhost:3000') || 
               (currentOrigin.includes('localhost') && currentOrigin !== 'http://localhost:5173')) {
-            console.error('[Preload] WARNING: Redirected to localhost! Fixing...');
-            console.error('[Preload] Current origin:', currentOrigin);
-            console.error('[Preload] Current href:', currentHref);
-            
-            // Giữ lại pathname, search, và hash
             const pathname = window.location.pathname;
             const search = window.location.search;
             const hash = window.location.hash;
-            
-            // Tạo URL mới với production domain
             const newUrl = PRODUCTION_URL + pathname + search + hash;
-            
-            console.log('[Preload] Redirecting to:', newUrl);
-            
-            // Redirect ngay lập tức
             window.location.replace(newUrl);
-            return true; // Đã redirect
+            return true;
           }
-          return false; // Không cần redirect
+          return false;
         }
         
-        // Kiểm tra ngay khi script load
         if (fixLocalhostRedirect()) {
-          return; // Đã redirect, không cần làm gì nữa
+          return;
         }
         
-        // Listen cho hashchange (OAuth callback thường dùng hash)
-        window.addEventListener('hashchange', function() {
-          console.log('[Preload] Hash changed, checking for localhost redirect...');
-          fixLocalhostRedirect();
-        }, true); // Use capture phase để chạy sớm nhất
+        window.addEventListener('hashchange', fixLocalhostRedirect, true);
+        window.addEventListener('popstate', fixLocalhostRedirect, true);
         
-        // Listen cho popstate
-        window.addEventListener('popstate', function() {
-          console.log('[Preload] Popstate, checking for localhost redirect...');
-          fixLocalhostRedirect();
-        }, true);
-        
-        // Intercept history API
         const originalPushState = history.pushState;
         const originalReplaceState = history.replaceState;
         
@@ -127,8 +102,6 @@
           originalReplaceState.apply(history, arguments);
           setTimeout(fixLocalhostRedirect, 0);
         };
-        
-        console.log('[Preload] Localhost redirect interceptor initialized');
       })();
     </script>
     <script type="module" src="/src/main.tsx"></script>

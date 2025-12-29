@@ -23,7 +23,7 @@ export default function StudentExamTake() {
 
   const { violations, violationCount, currentViolation, requestFullscreen, isFullscreen } = useAntiCheat({
     onViolation: (violation) => {
-      console.log('Violation:', violation)
+      // Violation detected
       // Hiển thị toast với thông báo chi tiết
       toast.error(`Vi phạm: ${violation.description}`, {
         duration: 5000,
@@ -188,7 +188,7 @@ export default function StudentExamTake() {
         } catch (error: any) {
           // Nếu lỗi RLS, thử lại với student_id từ profile
           if (error.message?.includes('row-level security')) {
-            console.error('RLS error, retrying with explicit student_id')
+            // RLS error, retrying
             // Không cần làm gì, vì startAttempt đã tự động dùng auth.uid()
             toast.error('Lỗi khi bắt đầu làm bài. Vui lòng thử lại.')
           } else {
@@ -229,7 +229,7 @@ export default function StudentExamTake() {
       try {
         await examApi.submitResponse(attempt.id, questionId, answerId)
       } catch (error) {
-        console.error('Error saving response:', error)
+        // Ignore errors
       }
     }
   }
@@ -242,7 +242,7 @@ export default function StudentExamTake() {
       try {
         await examApi.submitResponse(attempt.id, questionId, answerId, value)
       } catch (error) {
-        console.error('Error saving true/false response:', error)
+        // Ignore errors
       }
     }
   }
@@ -255,7 +255,7 @@ export default function StudentExamTake() {
       try {
         await examApi.submitResponse(attempt.id, questionId, null, textAnswer)
       } catch (error) {
-        console.error('Error saving short answer:', error)
+        // Ignore errors
       }
     }
   }

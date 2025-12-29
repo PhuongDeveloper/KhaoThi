@@ -33,21 +33,17 @@ export default function StudentHistory() {
             filter: `student_id=eq.${profile.id}`,
           },
           () => {
-            console.log('[StudentHistory] Attempt changed, refreshing...')
             cache.invalidate(CACHE_KEYS.attempts(profile.id))
             fetchHistory()
           }
         )
         .subscribe()
 
-      // Auto-refresh mỗi 30 giây
       const refreshInterval = setInterval(() => {
-        console.log('[StudentHistory] Auto-refreshing...')
         fetchHistory()
       }, 30000)
 
       return () => {
-        console.log('[StudentHistory] Cleaning up subscriptions')
         supabase.removeChannel(channel)
         clearInterval(refreshInterval)
       }

@@ -80,10 +80,9 @@ export default function ExamMonitoring() {
           table: 'exam_attempts',
           filter: `exam_id=eq.${id}`,
         },
-        (payload) => {
-          console.log('Attempt changed:', payload)
-          fetchData()
-        }
+          () => {
+            fetchData()
+          }
       )
       .subscribe()
 
@@ -100,8 +99,7 @@ export default function ExamMonitoring() {
             table: 'exam_responses',
             filter: `attempt_id=eq.${attempt.id}`,
           },
-          (payload) => {
-            console.log('Response changed:', payload)
+          () => {
             if (selectedAttempt?.id === attempt.id) {
               loadAttemptDetails(attempt.id)
             }
@@ -137,7 +135,7 @@ export default function ExamMonitoring() {
 
       setSelectedResponses(responsesMap)
     } catch (error: any) {
-      console.error('Error loading attempt details:', error)
+      // Ignore errors
     }
   }
 

@@ -37,7 +37,7 @@ export default function AdminExams() {
       const data = await getClasses()
       setClasses(data)
     } catch (error: any) {
-      console.error('Error fetching classes:', error)
+      // Ignore errors
     }
   }
 

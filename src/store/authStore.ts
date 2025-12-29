@@ -37,14 +37,8 @@ export const useAuthStore = create<AuthState>()(
       initialized: false,
 
   initialize: async () => {
-    console.log('[AuthStore] initialize() called')
-    const startTime = Date.now()
     set({ loading: true })
     try {
-      console.log('[AuthStore] Getting session...')
-      const sessionStartTime = Date.now()
-      
-      // Thêm timeout cho getSession
       const sessionPromise = supabase.auth.getSession()
       const sessionTimeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Session fetch timeout')), 2000)
@@ -55,53 +49,29 @@ export const useAuthStore = create<AuthState>()(
         sessionTimeoutPromise
       ]) as { data: { session: any }, error: any }
       
-      const sessionDuration = Date.now() - sessionStartTime
-      console.log(`[AuthStore] Session retrieved in ${sessionDuration}ms, has session:`, !!session)
-      
       if (error) {
-        console.error('[AuthStore] Error getting session:', error)
-        // Vẫn set initialized để không block app
         set({ session: null, user: null, profile: null, loading: false, initialized: true })
         return
       }
       
       set({ session, user: session?.user ?? null })
-      console.log('[AuthStore] Session set, user:', session?.user?.id)
 
       if (session?.user) {
         try {
-          console.log('[AuthStore] Fetching profile...')
-          const profileStartTime = Date.now()
-          // Fetch profile với timeout ngắn hơn (3s thay vì 5s)
           const profilePromise = get().fetchProfile()
           const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
           )
-          
           await Promise.race([profilePromise, timeoutPromise])
-          const profileDuration = Date.now() - profileStartTime
-          console.log(`[AuthStore] Profile fetched in ${profileDuration}ms`)
         } catch (profileError) {
-          console.error('[AuthStore] Error fetching profile during init:', profileError)
-          // Nếu có profile từ localStorage, giữ lại
-          const cachedProfile = get().profile
-          if (cachedProfile) {
-            console.log('[AuthStore] Using cached profile due to fetch error')
-          }
-          // Nếu không, để null và ProtectedRoute sẽ xử lý
+          // Ignore profile fetch errors during init
         }
       } else {
-        console.log('[AuthStore] No session, clearing profile')
-        // Không có session, clear profile
         set({ profile: null })
       }
     } catch (error) {
-      console.error('[AuthStore] Error initializing auth:', error)
-      // Vẫn set initialized để không block app
+      // Ignore initialization errors
     } finally {
-      const totalDuration = Date.now() - startTime
-      console.log(`[AuthStore] Initialization completed in ${totalDuration}ms`)
-      // Luôn set initialized = true để app không bị stuck
       set({ loading: false, initialized: true })
     }
   },
@@ -135,53 +105,23 @@ export const useAuthStore = create<AuthState>()(
 
   signInWithGoogle: async () => {
     try {
-      // Đảm bảo luôn sử dụng URL hiện tại, không dùng cached
       const currentOrigin = window.location.origin
       const redirectUrl = `${currentOrigin}/auth/callback`
       
-      console.log('[AuthStore] Current origin:', currentOrigin)
-      console.log('[AuthStore] Google OAuth redirect URL:', redirectUrl)
-      console.log('[AuthStore] Full URL:', window.location.href)
-      
-      // Force redirect URL bằng cách thêm vào query params và options
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: redirectUrl,
-          // Thêm skipHttpRedirect để xử lý redirect thủ công nếu cần
           skipBrowserRedirect: false,
           queryParams: {
-            // Force không cache redirect và luôn chọn account
             prompt: 'select_account',
-            // Thêm redirect_uri vào query params để đảm bảo Google nhận được
             access_type: 'offline',
           },
         },
       })
       
-      console.log('[AuthStore] OAuth response data:', data)
-      
-      if (error) {
-        console.error('[AuthStore] Google OAuth error:', error)
-        console.error('[AuthStore] Error details:', JSON.stringify(error, null, 2))
-        throw error
-      }
-      
-      // Nếu có URL trong response, log để debug
-      if (data?.url) {
-        console.log('[AuthStore] OAuth redirect URL from Supabase:', data.url)
-        // Kiểm tra xem URL có chứa redirect_uri đúng không
-        const urlObj = new URL(data.url)
-        const redirectUri = urlObj.searchParams.get('redirect_uri')
-        console.log('[AuthStore] Redirect URI in OAuth URL:', redirectUri)
-        
-        if (redirectUri && redirectUri.includes('localhost:3000')) {
-          console.error('[AuthStore] WARNING: OAuth URL contains localhost:3000!')
-          console.error('[AuthStore] This means Supabase is using cached/stored redirect URI')
-        }
-      }
+      if (error) throw error
     } catch (error: any) {
-      console.error('[AuthStore] Google OAuth failed:', error)
       throw new Error(error.message || 'Đăng nhập với Google thất bại')
     }
   },
@@ -238,23 +178,15 @@ export const useAuthStore = create<AuthState>()(
 
   fetchProfile: async (): Promise<Profile | null> => {
     const { user } = get()
-    console.log('[AuthStore] fetchProfile() called, user:', user?.id)
     
     if (!user) {
-      console.log('[AuthStore] No user, returning null')
       set({ profile: null })
       return null
     }
 
-    // Lấy profile hiện tại từ state (có thể từ localStorage)
     const currentProfile = get().profile
-    console.log('[AuthStore] Current profile from state:', currentProfile?.id)
 
     try {
-      console.log('[AuthStore] Querying profiles table...')
-      const queryStartTime = Date.now()
-      
-      // Thêm timeout cho profile query để tránh hang
       const queryPromise = supabase
         .from('profiles')
         .select('*')
@@ -269,25 +201,13 @@ export const useAuthStore = create<AuthState>()(
         queryPromise,
         timeoutPromise
       ]) as { data: any, error: any }
-      
-      const queryDuration = Date.now() - queryStartTime
-      console.log(`[AuthStore] Profile query completed in ${queryDuration}ms, has data:`, !!data, 'error:', error?.message)
 
       if (error) {
-        console.error('[AuthStore] Profile query error:', error.code, error.message)
-        // Nếu timeout, dùng cached profile
         if (error.message?.includes('timeout')) {
-          console.warn('[AuthStore] Profile query timeout, using cached profile if available')
-          if (currentProfile) {
-            console.log('[AuthStore] Returning cached profile due to timeout')
-            return currentProfile
-          }
-          console.log('[AuthStore] No cached profile, returning null')
+          if (currentProfile) return currentProfile
           return null
         }
-        // Nếu lỗi RLS hoặc không tìm thấy, thử tạo mới
         if (error.code === 'PGRST116' || error.message?.includes('permission')) {
-          console.warn('[AuthStore] Profile not found or permission denied, attempting to create...')
           try {
             const { data: newProfile, error: createError } = await supabase
               .from('profiles')
@@ -301,24 +221,14 @@ export const useAuthStore = create<AuthState>()(
               .single()
 
             if (createError) {
-              console.error('Error creating profile:', createError)
-              // Giữ profile cũ từ localStorage nếu có
-              if (currentProfile) {
-                console.warn('Using cached profile due to create error')
-                return currentProfile
-              }
+              if (currentProfile) return currentProfile
               return null
             }
 
             set({ profile: newProfile })
             return newProfile
           } catch (createErr) {
-            console.error('Error in profile creation:', createErr)
-            // Giữ profile cũ từ localStorage nếu có
-            if (currentProfile) {
-              console.warn('Using cached profile due to creation error')
-              return currentProfile
-            }
+            if (currentProfile) return currentProfile
             return null
           }
         } else {
@@ -326,7 +236,6 @@ export const useAuthStore = create<AuthState>()(
         }
       }
 
-      // Nếu không có profile, tạo mới
       if (!data) {
         try {
           const { data: newProfile, error: createError } = await supabase
@@ -341,39 +250,22 @@ export const useAuthStore = create<AuthState>()(
             .single()
 
           if (createError) {
-            console.error('Error creating profile:', createError)
-            // Giữ profile cũ từ localStorage nếu có
-            if (currentProfile) {
-              console.warn('Using cached profile due to create error')
-              return currentProfile
-            }
+            if (currentProfile) return currentProfile
             return null
           }
 
           set({ profile: newProfile })
           return newProfile
         } catch (createErr) {
-          console.error('Error in profile creation:', createErr)
-          // Giữ profile cũ từ localStorage nếu có
-          if (currentProfile) {
-            console.warn('Using cached profile due to creation error')
-            return currentProfile
-          }
+          if (currentProfile) return currentProfile
           return null
         }
       } else {
-        // Có data, update profile
         set({ profile: data })
         return data
       }
     } catch (error) {
-      console.error('[AuthStore] Error fetching profile:', error)
-      // Giữ profile cũ từ localStorage nếu có để không bị redirect về login
-      if (currentProfile) {
-        console.warn('[AuthStore] Using cached profile due to fetch error')
-        return currentProfile
-      }
-      console.log('[AuthStore] No cached profile, returning null')
+      if (currentProfile) return currentProfile
       return null
     }
   },
