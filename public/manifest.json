@@ -1,0 +1,28 @@
+{
+  "name": "Hệ thống Thi Trắc nghiệm - PTDTNT ATK Sơn Dương",
+  "short_name": "Thi Trắc nghiệm",
+  "description": "Hệ thống thi trắc nghiệm trực tuyến với tính năng chống gian lận và tích hợp AI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "lang": "vi",
+  "dir": "ltr"
+}
+

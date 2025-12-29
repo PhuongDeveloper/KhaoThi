@@ -1,0 +1,17 @@
+# robots.txt for Hệ thống Thi Trắc nghiệm - PTDTNT ATK Sơn Dương
+
+User-agent: *
+Allow: /
+
+# Disallow admin and sensitive pages
+Disallow: /admin/
+Disallow: /teacher/
+Disallow: /student/
+
+# Allow public pages
+Allow: /auth/login
+Allow: /auth/register
+
+# Sitemap (update with your actual domain after deployment)
+# Sitemap: https://your-domain.vercel.app/sitemap.xml
+
