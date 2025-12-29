@@ -14,32 +14,66 @@ import Loader from './components/Loader'
 function App() {
   const { initialize, initialized, loading } = useAuthStore()
 
-  // Intercept và log mọi thay đổi URL để debug redirect issue
+  // Intercept và fix redirect về localhost issue
   useEffect(() => {
-    const logUrlChange = () => {
-      console.log('[App] URL changed to:', window.location.href)
-      console.log('[App] Origin:', window.location.origin)
+    const fixLocalhostRedirect = () => {
+      const currentOrigin = window.location.origin
+      const currentHref = window.location.href
       
-      // Nếu detect redirect về localhost, log warning
-      if (window.location.origin.includes('localhost:3000')) {
-        console.error('[App] WARNING: Redirected to localhost:3000!')
-        console.error('[App] Current origin should be:', window.location.origin)
-        console.error('[App] Full URL:', window.location.href)
+      console.log('[App] URL changed to:', currentHref)
+      console.log('[App] Origin:', currentOrigin)
+      
+      // Nếu detect redirect về localhost, fix ngay lập tức
+      if (currentOrigin.includes('localhost:3000') || currentOrigin.includes('localhost')) {
+        console.error('[App] WARNING: Redirected to localhost! Fixing...')
+        
+        // Lấy production URL từ environment hoặc hardcode
+        const productionUrl = 'https://www.hethongthi.online'
+        
+        // Giữ lại pathname, search, và hash
+        const pathname = window.location.pathname
+        const search = window.location.search
+        const hash = window.location.hash
+        
+        // Tạo URL mới với production domain
+        const newUrl = `${productionUrl}${pathname}${search}${hash}`
+        
+        console.log('[App] Redirecting to:', newUrl)
+        
+        // Redirect ngay lập tức
+        window.location.replace(newUrl)
+        return
       }
     }
     
-    // Log ngay khi component mount
-    logUrlChange()
+    // Kiểm tra ngay khi component mount
+    fixLocalhostRedirect()
     
     // Listen cho popstate events (back/forward navigation)
-    window.addEventListener('popstate', logUrlChange)
+    window.addEventListener('popstate', fixLocalhostRedirect)
     
     // Listen cho hashchange (OAuth callback thường dùng hash)
-    window.addEventListener('hashchange', logUrlChange)
+    window.addEventListener('hashchange', fixLocalhostRedirect)
+    
+    // Listen cho location change (nếu có)
+    const originalPushState = history.pushState
+    const originalReplaceState = history.replaceState
+    
+    history.pushState = function(...args) {
+      originalPushState.apply(history, args)
+      setTimeout(fixLocalhostRedirect, 0)
+    }
+    
+    history.replaceState = function(...args) {
+      originalReplaceState.apply(history, args)
+      setTimeout(fixLocalhostRedirect, 0)
+    }
     
     return () => {
-      window.removeEventListener('popstate', logUrlChange)
-      window.removeEventListener('hashchange', logUrlChange)
+      window.removeEventListener('popstate', fixLocalhostRedirect)
+      window.removeEventListener('hashchange', fixLocalhostRedirect)
+      history.pushState = originalPushState
+      history.replaceState = originalReplaceState
     }
   }, [])
 
