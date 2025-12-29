@@ -232,9 +232,9 @@ export default function TeacherExamCreate() {
       // Tạo map để theo dõi index theo từng loại câu hỏi (không sử dụng nhưng giữ lại để tương lai có thể cần)
       // const typeIndexMap: Record<string, number> = {
       //   multiple_choice: 0,
-        true_false_multi: 0,
-        short_answer: 0,
-      }
+      //   true_false_multi: 0,
+      //   short_answer: 0,
+      // }
 
       calculatedAnswers.forEach((answer) => {
         // Tìm câu hỏi tương ứng trong manualQuestions
