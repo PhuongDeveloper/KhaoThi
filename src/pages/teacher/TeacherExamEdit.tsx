@@ -19,8 +19,6 @@ export default function TeacherExamEdit() {
   const [subjects, setSubjects] = useState<any[]>([])
   const [classes, setClasses] = useState<any[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string>('')
-  const [showAssignModal, setShowAssignModal] = useState(false)
-  const [exam, setExam] = useState<any>(null)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -51,7 +49,6 @@ export default function TeacherExamEdit() {
         getClasses(),
       ])
 
-      setExam(examData)
       setSubjects(subjectsData)
       setClasses(classesData)
       setFormData({
@@ -59,10 +56,10 @@ export default function TeacherExamEdit() {
         description: examData.description || '',
         subject_id: examData.subject_id,
         duration_minutes: examData.duration_minutes,
-        total_score: examData.total_score || 10,
-        multiple_choice_score: examData.multiple_choice_score || 0,
-        true_false_multi_score: examData.true_false_multi_score || 0,
-        short_answer_score: examData.short_answer_score || 0,
+        total_score: (examData as any).total_score || 10,
+        multiple_choice_score: (examData as any).multiple_choice_score || 0,
+        true_false_multi_score: (examData as any).true_false_multi_score || 0,
+        short_answer_score: (examData as any).short_answer_score || 0,
         passing_score: examData.passing_score || 50,
         shuffle_questions: examData.shuffle_questions,
         shuffle_answers: examData.shuffle_answers,
@@ -87,17 +84,14 @@ export default function TeacherExamEdit() {
 
     setSaving(true)
     try {
-      // Chuyển chuỗi rỗng thành null cho timestamp
-      const examData = {
-        ...formData,
-        start_time: formData.start_time || null,
-        end_time: formData.end_time || null,
-      }
-      await examApi.updateExam(id!, examData)
+      await examApi.updateExam(id!, formData)
       
       // Nếu đang publish và có chọn lớp, giao bài cho lớp
       if (formData.status === 'published' && selectedClassId) {
-        await examApi.assignExamToClass(id!, selectedClassId)
+        const now = new Date()
+        const startTime = new Date(now.getTime() + 5 * 60 * 1000) // 5 phút từ bây giờ
+        const endTime = new Date(startTime.getTime() + formData.duration_minutes * 60 * 1000)
+        await examApi.assignExamToClass(id!, selectedClassId, startTime.toISOString(), endTime.toISOString())
         toast.success('Cập nhật và giao bài thi cho lớp thành công')
       } else {
         toast.success('Cập nhật bài thi thành công')

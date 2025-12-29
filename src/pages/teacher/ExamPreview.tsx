@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
-import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { Clock, CheckCircle, ChevronLeft, ChevronRight, X, Eye } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -85,7 +84,8 @@ export default function ExamPreview() {
 
       if (examData.shuffle_answers) {
         shuffledQuestions = shuffledQuestions.map((q) => {
-          if (q.question_type === 'multiple_choice' || q.question_type === 'true_false_multi') {
+          const questionType = q.question_type as string
+          if (questionType === 'multiple_choice' || questionType === 'true_false_multi') {
             return {
               ...q,
               answers: [...(q.answers || [])].sort(() => Math.random() - 0.5),
@@ -100,18 +100,19 @@ export default function ExamPreview() {
       // Lấy đáp án đúng để hiển thị sau khi submit
       const correctAnswersMap: Record<string, string> = {}
       shuffledQuestions.forEach((q) => {
-        if (q.question_type === 'multiple_choice') {
+        const questionType = q.question_type as string
+        if (questionType === 'multiple_choice') {
           const correctAnswer = q.answers?.find((a: any) => a.is_correct)
           if (correctAnswer) {
             correctAnswersMap[q.id] = correctAnswer.id
           }
-        } else if (q.question_type === 'true_false_multi') {
+        } else if (questionType === 'true_false_multi') {
           q.answers?.forEach((a: any) => {
             if (a.is_correct !== null) {
               correctAnswersMap[`${q.id}-${a.id}`] = a.is_correct ? 'true' : 'false'
             }
           })
-        } else if (q.question_type === 'short_answer') {
+        } else if (questionType === 'short_answer') {
           // Short answer sẽ được chấm sau
         }
       })

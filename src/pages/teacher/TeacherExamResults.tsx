@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { Users, Eye, Monitor } from 'lucide-react'
+import { Users, Eye } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import PageHeader from '../../components/PageHeader'
@@ -39,7 +39,6 @@ export default function TeacherExamResults() {
 
       setExam(examData)
       setAttempts(attemptsData)
-      setQuestions(questionsData)
 
       // Tính thống kê tỉ lệ đúng theo từng câu hỏi (async)
       if (attemptsData.length > 0 && questionsData.length > 0) {
