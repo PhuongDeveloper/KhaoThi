@@ -4,12 +4,11 @@ import { subjectApi } from '../../lib/api/subjects'
 import { useAuthStore } from '../../store/authStore'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { BookOpen, TrendingUp, BarChart3, RefreshCw, CheckCircle, XCircle, ArrowRight } from 'lucide-react'
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BookOpen, TrendingUp, BarChart3, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function StudentGrades() {
-  const { profile } = useAuthStore()
   const [subjects, setSubjects] = useState<any[]>([])
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
   const [attempts, setAttempts] = useState<any[]>([])

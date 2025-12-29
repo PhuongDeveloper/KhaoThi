@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { BarChart3, AlertTriangle, CheckCircle, Users, Eye, TrendingUp, Monitor } from 'lucide-react'
+import { Users, Eye, Monitor } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import PageHeader from '../../components/PageHeader'
@@ -20,7 +20,6 @@ export default function TeacherExamResults() {
   
   const [exam, setExam] = useState<any>(null)
   const [attempts, setAttempts] = useState<any[]>([])
-  const [questions, setQuestions] = useState<any[]>([])
   const [questionStats, setQuestionStats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 

@@ -3,14 +3,13 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-import { Clock, CheckCircle, ChevronLeft, ChevronRight, FileText, X, Eye } from 'lucide-react'
+import { Clock, CheckCircle, ChevronLeft, ChevronRight, X, Eye } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function ExamPreview() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { profile } = useAuthStore()
   
   // Detect context: admin or teacher
   const isAdmin = location.pathname.startsWith('/admin')
@@ -26,7 +25,6 @@ export default function ExamPreview() {
   const [examStarted, setExamStarted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [showQuestionList, setShowQuestionList] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [score, setScore] = useState<number | null>(null)
   const [correctAnswers, setCorrectAnswers] = useState<Record<string, string>>({})

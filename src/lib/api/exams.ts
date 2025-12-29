@@ -444,7 +444,6 @@ export const examApi = {
     if (!expiredAttempts || expiredAttempts.length === 0) return []
 
     // Lấy assignment để kiểm tra end_time từ assignment
-    const attemptIds = expiredAttempts.map((a: any) => a.id)
     const studentIds = [...new Set(expiredAttempts.map((a: any) => a.student_id))]
     const examIds = [...new Set(expiredAttempts.map((a: any) => a.exam_id))]
 

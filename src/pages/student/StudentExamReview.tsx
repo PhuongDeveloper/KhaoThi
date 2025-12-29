@@ -4,7 +4,7 @@ import { examApi } from '../../lib/api/exams'
 import { supabase } from '../../lib/supabase'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-import { CheckCircle, XCircle, ArrowLeft, BookOpen, Clock, AlertCircle } from 'lucide-react'
+import { CheckCircle, XCircle, ArrowLeft, Clock, AlertCircle } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function StudentExamReview() {

@@ -229,9 +229,9 @@ export default function TeacherExamCreate() {
       // Cần map lại với originalIdx trong manualQuestions
       const updatedQuestions = [...manualQuestions]
       
-      // Tạo map để theo dõi index theo từng loại câu hỏi
-      const typeIndexMap: Record<string, number> = {
-        multiple_choice: 0,
+      // Tạo map để theo dõi index theo từng loại câu hỏi (không sử dụng nhưng giữ lại để tương lai có thể cần)
+      // const typeIndexMap: Record<string, number> = {
+      //   multiple_choice: 0,
         true_false_multi: 0,
         short_answer: 0,
       }

@@ -5,7 +5,7 @@ import Loader from '../../components/Loader'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
-  const { user, profile, fetchProfile } = useAuthStore()
+  const { fetchProfile } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {

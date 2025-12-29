@@ -117,9 +117,11 @@ export default function TeacherExamEdit() {
       return
     }
     try {
-      await examApi.assignExamToClass(id!, selectedClassId)
+      const now = new Date()
+      const startTime = new Date(now.getTime() + 5 * 60 * 1000) // 5 phút từ bây giờ
+      const endTime = new Date(startTime.getTime() + formData.duration_minutes * 60 * 1000)
+      await examApi.assignExamToClass(id!, selectedClassId, startTime.toISOString(), endTime.toISOString())
       toast.success('Giao bài thi cho lớp thành công')
-      setShowAssignModal(false)
       setSelectedClassId('')
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi giao bài thi')

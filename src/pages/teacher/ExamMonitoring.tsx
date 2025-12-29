@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { Eye, AlertTriangle, User, Clock, XCircle, Maximize2, Ban } from 'lucide-react'
+import { Eye, AlertTriangle, User, Ban } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import PageHeader from '../../components/PageHeader'
 import { useConfirm } from '../../hooks/useConfirm'
@@ -152,7 +152,7 @@ export default function ExamMonitoring() {
   }
 
   const handleSuspendStudent = async (attempt: any) => {
-    const confirmed = await confirm({
+    const confirmed = await confirm.confirm({
       title: 'Đình chỉ thi học sinh',
       message: `Bạn có chắc chắn muốn đình chỉ thi cho học sinh ${(attempt.student as any)?.full_name}? Hành động này sẽ tự động nộp bài và đóng phiên thi của học sinh.`,
       confirmText: 'Đình chỉ',

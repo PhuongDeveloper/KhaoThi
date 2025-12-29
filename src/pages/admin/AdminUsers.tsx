@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { userApi } from '../../lib/api/users'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
-import { Plus, Edit, Trash2, UserCog, Users } from 'lucide-react'
+import { Edit, Trash2, Users } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import PageHeader from '../../components/PageHeader'
@@ -97,7 +97,7 @@ export default function AdminUsers() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
-    toast.info('Chức năng tạo user mới cần được thực hiện qua Supabase Dashboard. Admin có thể cập nhật role của user đã tồn tại.')
+    toast('Chức năng tạo user mới cần được thực hiện qua Supabase Dashboard. Admin có thể cập nhật role của user đã tồn tại.', { icon: 'ℹ️' })
     setShowModal(false)
   }
 

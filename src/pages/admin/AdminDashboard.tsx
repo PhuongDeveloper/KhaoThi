@@ -26,8 +26,8 @@ export default function AdminDashboard() {
       
       try {
         const exams = await supabase.from('exams').select('id', { count: 'exact', head: true })
-        if (!exams.error) {
-          examsResult = exams
+        if (!exams.error && exams.count !== null) {
+          examsResult = { count: exams.count }
         }
       } catch (e) {
         console.warn('Error fetching exams count:', e)
@@ -35,8 +35,8 @@ export default function AdminDashboard() {
       
       try {
         const attempts = await supabase.from('exam_attempts').select('id', { count: 'exact', head: true })
-        if (!attempts.error) {
-          attemptsResult = attempts
+        if (!attempts.error && attempts.count !== null) {
+          attemptsResult = { count: attempts.count }
         }
       } catch (e) {
         console.warn('Error fetching attempts count:', e)

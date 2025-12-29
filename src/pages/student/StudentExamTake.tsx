@@ -4,13 +4,12 @@ import { examApi } from '../../lib/api/exams'
 import { useAntiCheat } from '../../hooks/useAntiCheat'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-import { Clock, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, FileText, Image as ImageIcon, Maximize2, X } from 'lucide-react'
+import { Clock, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, FileText, Maximize2 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function StudentExamTake() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { profile } = useAuthStore()
   const [exam, setExam] = useState<any>(null)
   const [questions, setQuestions] = useState<any[]>([])
   const [attempt, setAttempt] = useState<any>(null)
@@ -22,7 +21,6 @@ export default function StudentExamTake() {
   const [examStarted, setExamStarted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [showQuestionList, setShowQuestionList] = useState(false)
 
   const { violations, violationCount, currentViolation, requestFullscreen, isFullscreen } = useAntiCheat({
     onViolation: (violation) => {

@@ -159,8 +159,8 @@ export const useAuthStore = create<AuthState>()(
             full_name: fullName,
             role: 'student', // Luôn là student
           },
+          emailRedirectTo: `${window.location.origin}/login`,
         },
-        email_redirect_to: `${window.location.origin}/login`,
       })
 
       if (error) throw error
