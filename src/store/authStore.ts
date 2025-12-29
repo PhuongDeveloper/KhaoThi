@@ -135,14 +135,33 @@ export const useAuthStore = create<AuthState>()(
 
   signInWithGoogle: async () => {
     try {
+      // Đảm bảo luôn sử dụng URL hiện tại, không dùng cached
+      const currentOrigin = window.location.origin
+      const redirectUrl = `${currentOrigin}/auth/callback`
+      
+      console.log('[AuthStore] Current origin:', currentOrigin)
+      console.log('[AuthStore] Google OAuth redirect URL:', redirectUrl)
+      console.log('[AuthStore] Full URL:', window.location.href)
+      
+      // Xóa bất kỳ redirect URL cũ nào có thể được cache
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
+          queryParams: {
+            // Force không cache redirect
+            prompt: 'select_account',
+          },
         },
       })
-      if (error) throw error
+      
+      if (error) {
+        console.error('[AuthStore] Google OAuth error:', error)
+        console.error('[AuthStore] Error details:', JSON.stringify(error, null, 2))
+        throw error
+      }
     } catch (error: any) {
+      console.error('[AuthStore] Google OAuth failed:', error)
       throw new Error(error.message || 'Đăng nhập với Google thất bại')
     }
   },
