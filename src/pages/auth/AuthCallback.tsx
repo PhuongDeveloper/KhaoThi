@@ -1,21 +1,46 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import Loader from '../../components/Loader'
 
 export default function AuthCallback() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { fetchProfile } = useAuthStore()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        // Log thông tin URL hiện tại
+        console.log('[AuthCallback] Current URL:', window.location.href)
+        console.log('[AuthCallback] Current origin:', window.location.origin)
+        console.log('[AuthCallback] Location pathname:', location.pathname)
+        console.log('[AuthCallback] Location search:', location.search)
+        console.log('[AuthCallback] Location hash:', location.hash)
+        
+        // Kiểm tra xem có access_token trong hash không
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const errorParam = hashParams.get('error')
+        
+        console.log('[AuthCallback] Access token in hash:', !!accessToken)
+        console.log('[AuthCallback] Error in hash:', errorParam)
+        
+        if (errorParam) {
+          console.error('[AuthCallback] OAuth error:', errorParam)
+          setError(`Lỗi đăng nhập: ${errorParam}`)
+          setTimeout(() => navigate('/login', { replace: true }), 2000)
+          return
+        }
+        
         // Đợi một chút để Supabase xử lý OAuth callback
         await new Promise(resolve => setTimeout(resolve, 1000))
         
         // Kiểm tra xem có user không
         const currentUser = useAuthStore.getState().user
+        console.log('[AuthCallback] Current user:', currentUser?.id)
+        
         if (!currentUser) {
           setError('Không tìm thấy thông tin người dùng')
           setTimeout(() => navigate('/login', { replace: true }), 2000)

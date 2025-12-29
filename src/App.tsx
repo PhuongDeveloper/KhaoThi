@@ -14,6 +14,35 @@ import Loader from './components/Loader'
 function App() {
   const { initialize, initialized, loading } = useAuthStore()
 
+  // Intercept và log mọi thay đổi URL để debug redirect issue
+  useEffect(() => {
+    const logUrlChange = () => {
+      console.log('[App] URL changed to:', window.location.href)
+      console.log('[App] Origin:', window.location.origin)
+      
+      // Nếu detect redirect về localhost, log warning
+      if (window.location.origin.includes('localhost:3000')) {
+        console.error('[App] WARNING: Redirected to localhost:3000!')
+        console.error('[App] Current origin should be:', window.location.origin)
+        console.error('[App] Full URL:', window.location.href)
+      }
+    }
+    
+    // Log ngay khi component mount
+    logUrlChange()
+    
+    // Listen cho popstate events (back/forward navigation)
+    window.addEventListener('popstate', logUrlChange)
+    
+    // Listen cho hashchange (OAuth callback thường dùng hash)
+    window.addEventListener('hashchange', logUrlChange)
+    
+    return () => {
+      window.removeEventListener('popstate', logUrlChange)
+      window.removeEventListener('hashchange', logUrlChange)
+    }
+  }, [])
+
   useEffect(() => {
     console.log('[App] Starting initialization...')
     const startTime = Date.now()
