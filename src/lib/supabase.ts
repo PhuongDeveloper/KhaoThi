@@ -7,17 +7,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-// Tự động detect redirect URL dựa trên môi trường hiện tại
-const getRedirectUrl = () => {
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin}/auth/callback`
-  }
-  return undefined
-}
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    redirectTo: getRedirectUrl(),
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
