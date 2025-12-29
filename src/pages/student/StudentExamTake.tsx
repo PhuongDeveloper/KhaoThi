@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
 import { useAntiCheat } from '../../hooks/useAntiCheat'
-import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { Clock, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, FileText, Maximize2 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -167,7 +166,8 @@ export default function StudentExamTake() {
 
       if (examData.shuffle_answers) {
         shuffledQuestions = shuffledQuestions.map((q) => {
-          if (q.question_type === 'multiple_choice' || q.question_type === 'true_false_multi') {
+          const questionType = q.question_type as string
+          if (questionType === 'multiple_choice' || questionType === 'true_false_multi') {
             return {
               ...q,
               answers: [...(q.answers || [])].sort(() => Math.random() - 0.5),
@@ -347,7 +347,7 @@ export default function StudentExamTake() {
                   <p className="font-semibold">⚠️ Cảnh báo vi phạm!</p>
                   <p className="text-sm text-red-100">{currentViolation.description}</p>
                   <p className="text-xs text-red-200 mt-1">
-                    Số lần vi phạm: {violationCount}/{maxViolations || 5}
+                    Số lần vi phạm: {violationCount}/5
                   </p>
                 </div>
               </div>

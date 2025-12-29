@@ -664,8 +664,8 @@ export const examApi = {
         exam: exam ? {
           ...exam,
           // Sử dụng start_time và end_time từ assignment nếu có, nếu không thì dùng từ exam
-          start_time: times.start_time || exam.start_time || null,
-          end_time: times.end_time || exam.end_time || null,
+          start_time: times.start_time || (exam as any).start_time || null,
+          end_time: times.end_time || (exam as any).end_time || null,
           subject: exam.subject_id ? subjectsMap[exam.subject_id] || null : null,
           teacher: exam.teacher_id ? teachersMap[exam.teacher_id] || null : null,
         } : null,
@@ -783,7 +783,7 @@ export const examApi = {
       if (answer) {
         // textAnswer là "true" hoặc "false" (string)
         // answer.is_correct là boolean
-        const studentChoice = textAnswer === 'true' || textAnswer === true
+        const studentChoice = textAnswer === 'true'
         const correctAnswer = answer.is_correct === true
         isCorrect = studentChoice === correctAnswer
         // Tính điểm: chia đều điểm của phần true_false_multi cho số lượng answers trong câu hỏi

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { examApi } from '../../lib/api/exams'
 import { subjectApi } from '../../lib/api/subjects'
-import { useAuthStore } from '../../store/authStore'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { BookOpen, TrendingUp, BarChart3, RefreshCw, CheckCircle, XCircle } from 'lucide-react'

@@ -88,6 +88,7 @@ export default function ExamMonitoring() {
       .subscribe()
 
     // Subscribe to responses changes cho từng attempt
+    const responseChannels: any[] = []
     activeAttempts.forEach((attempt) => {
       const responseChannel = supabase
         .channel(`exam-responses-${attempt.id}`)
@@ -107,12 +108,12 @@ export default function ExamMonitoring() {
           }
         )
         .subscribe()
+      responseChannels.push(responseChannel)
     })
 
     return () => {
       supabase.removeChannel(channel)
-      activeAttempts.forEach((attempt) => {
-        const responseChannel = supabase.channel(`exam-responses-${attempt.id}`)
+      responseChannels.forEach((responseChannel) => {
         supabase.removeChannel(responseChannel)
       })
     }
