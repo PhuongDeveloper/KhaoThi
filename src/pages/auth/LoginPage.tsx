@@ -252,15 +252,7 @@ export default function LoginPage() {
       <footer className="absolute bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t border-gray-200 py-4 z-20">
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            © 2025 Hệ thống Thi trắc nghiệm PTDTNT ATK Sơn Dương. Phát triển bởi{' '}
-            <a 
-              href="https://www.facebook.com/phuongdeveloper/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-            >
-              PhuongDev
-            </a>
+            © 2025 Hệ thống Thi trắc nghiệm PTDTNT ATK Sơn Dương
           </p>
         </div>
       </footer>

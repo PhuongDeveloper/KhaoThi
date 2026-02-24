@@ -138,6 +138,9 @@ export const examApi = {
     const now = new Date().toISOString()
     const examData = {
       ...exam,
+      // Không cho Firestore nhận undefined
+      subject_id: exam.subject_id ?? null,
+      teacher_id: exam.teacher_id ?? null,
       start_time: (exam.start_time === '' || exam.start_time === null) ? null : exam.start_time,
       end_time: (exam.end_time === '' || exam.end_time === null) ? null : exam.end_time,
       created_at: now,
@@ -153,6 +156,9 @@ export const examApi = {
   async updateExam(id: string, exam: Database['public']['Tables']['exams']['Update']) {
     const examData = {
       ...exam,
+      // Không cho Firestore nhận undefined
+      subject_id: exam.subject_id ?? null,
+      teacher_id: exam.teacher_id ?? null,
       start_time: (exam.start_time === '' || exam.start_time === null || exam.start_time === undefined) ? null : exam.start_time,
       end_time: (exam.end_time === '' || exam.end_time === null || exam.end_time === undefined) ? null : exam.end_time,
       updated_at: new Date().toISOString(),
