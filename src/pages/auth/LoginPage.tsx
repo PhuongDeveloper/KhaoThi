@@ -16,13 +16,20 @@ export default function LoginPage() {
       const result: any = await signIn(email, password)
       
       // Đợi một chút để đảm bảo state được cập nhật hoàn toàn
-      await new Promise(resolve => setTimeout(resolve, 200))
+      await new Promise(resolve => setTimeout(resolve, 500))
       
       // Lấy profile từ result hoặc từ store (đã được cập nhật)
-      const currentProfile = result?.profile || useAuthStore.getState().profile
+      let currentProfile = result?.profile || useAuthStore.getState().profile
+      
+      // Nếu vẫn chưa có profile, retry fetch
+      if (!currentProfile) {
+        console.log('[LoginPage] Profile chưa có, đang retry fetch...')
+        currentProfile = await useAuthStore.getState().fetchProfile()
+      }
       
       if (currentProfile) {
         toast.success('Đăng nhập thành công')
+        console.log('[LoginPage] Profile:', currentProfile)
         
         // Redirect ngay lập tức
         const role = currentProfile.role
@@ -34,6 +41,7 @@ export default function LoginPage() {
           navigate('/student', { replace: true })
         }
       } else {
+        console.error('[LoginPage] Không thể lấy profile sau khi đăng nhập')
         toast.error('Không thể lấy thông tin người dùng. Vui lòng thử lại.')
       }
     } catch (error: any) {
@@ -123,6 +131,42 @@ export default function LoginPage() {
               onClick={async () => {
                 try {
                   await signInWithGoogle()
+                  
+                  // Đợi một chút để đảm bảo state được cập nhật hoàn toàn
+                  await new Promise(resolve => setTimeout(resolve, 500))
+                  
+                  // Lấy profile từ store
+                  const currentProfile = useAuthStore.getState().profile
+                  
+                  if (currentProfile) {
+                    toast.success('Đăng nhập thành công')
+                    
+                    // Redirect ngay lập tức
+                    const role = currentProfile.role
+                    if (role === 'admin') {
+                      navigate('/admin', { replace: true })
+                    } else if (role === 'teacher') {
+                      navigate('/teacher', { replace: true })
+                    } else {
+                      navigate('/student', { replace: true })
+                    }
+                  } else {
+                    // Retry fetch profile nếu chưa có
+                    const retryProfile = await useAuthStore.getState().fetchProfile()
+                    if (retryProfile) {
+                      toast.success('Đăng nhập thành công')
+                      const role = retryProfile.role
+                      if (role === 'admin') {
+                        navigate('/admin', { replace: true })
+                      } else if (role === 'teacher') {
+                        navigate('/teacher', { replace: true })
+                      } else {
+                        navigate('/student', { replace: true })
+                      }
+                    } else {
+                      toast.error('Không thể lấy thông tin người dùng. Vui lòng thử lại.')
+                    }
+                  }
                 } catch (error: any) {
                   toast.error(error.message || 'Đăng nhập với Google thất bại')
                 }

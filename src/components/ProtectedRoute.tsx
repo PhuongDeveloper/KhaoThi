@@ -15,27 +15,32 @@ export default function ProtectedRoute({ children, allowedRoles }: ProtectedRout
     const checkAuth = async () => {
       try {
         if (user && !profile) {
+          console.log('[ProtectedRoute] User có nhưng chưa có profile, đang fetch...')
           const fetchedProfile = await fetchProfile()
           if (!fetchedProfile) {
+            console.warn('[ProtectedRoute] Không thể fetch profile')
             setIsLoading(false)
             return
           }
+          console.log('[ProtectedRoute] Đã fetch profile thành công:', fetchedProfile)
         }
         
         if (!user) {
+          console.log('[ProtectedRoute] Chưa có user')
           setIsLoading(false)
           return
         }
-      } catch (error) {
-        // Ignore errors
+      } catch (error: any) {
+        console.error('[ProtectedRoute] Lỗi khi check auth:', error)
       } finally {
         setIsLoading(false)
       }
     }
     
     const timeout = setTimeout(() => {
+      console.warn('[ProtectedRoute] Timeout khi check auth')
       setIsLoading(false)
-    }, 3000)
+    }, 5000)
     
     checkAuth()
     
