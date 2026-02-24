@@ -44,7 +44,7 @@ export default function StudentExamDetail() {
 
       const responsesMap: Record<string, any> = {}
       responsesSnap.forEach((docSnap) => {
-        const r = { id: docSnap.id, ...docSnap.data() }
+        const r = { id: docSnap.id, ...docSnap.data() } as any
         if (r.question_id) {
           if (!responsesMap[r.question_id]) {
             responsesMap[r.question_id] = []

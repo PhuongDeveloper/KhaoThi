@@ -28,9 +28,10 @@ export const subjectApi = {
       const data = docSnap.data()
       subjects.push({
         id: docSnap.id,
-        ...data,
-        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
-        updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+        name: data.name || '',
+        code: data.code || '',
+        description: data.description || null,
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at || new Date().toISOString(),
       } as Subject)
     })
 
@@ -46,9 +47,10 @@ export const subjectApi = {
     const data = subjectDoc.data()
     return {
       id: subjectDoc.id,
-      ...data,
-      created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
-      updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+      name: data.name || '',
+      code: data.code || '',
+      description: data.description || null,
+      created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at || new Date().toISOString(),
     } as Subject
   },
 

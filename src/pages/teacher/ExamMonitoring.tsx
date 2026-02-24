@@ -105,11 +105,13 @@ export default function ExamMonitoring() {
 
       const responsesMap: Record<string, any[]> = {}
       responsesSnap.forEach((docSnap) => {
-        const r = { id: docSnap.id, ...docSnap.data() }
-        if (!responsesMap[r.question_id]) {
+        const r = { id: docSnap.id, ...docSnap.data() } as any
+        if (r.question_id && !responsesMap[r.question_id]) {
           responsesMap[r.question_id] = []
         }
-        responsesMap[r.question_id].push(r)
+        if (r.question_id) {
+          responsesMap[r.question_id].push(r)
+        }
       })
 
       setSelectedResponses(responsesMap)

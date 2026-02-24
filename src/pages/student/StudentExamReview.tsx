@@ -117,11 +117,13 @@ export default function StudentExamReview() {
       // Với true_false_multi, mỗi question có thể có nhiều responses (mỗi answer một response)
       const responsesMap: Record<string, any[]> = {}
       responsesSnap.forEach((doc) => {
-        const r = { id: doc.id, ...doc.data() }
-        if (!responsesMap[r.question_id]) {
+        const r = { id: doc.id, ...doc.data() } as any
+        if (r.question_id && !responsesMap[r.question_id]) {
           responsesMap[r.question_id] = []
         }
-        responsesMap[r.question_id].push(r)
+        if (r.question_id) {
+          responsesMap[r.question_id].push(r)
+        }
       })
 
       setExam(examData)

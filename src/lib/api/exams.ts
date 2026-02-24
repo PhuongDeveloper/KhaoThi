@@ -549,8 +549,15 @@ export const examApi = {
       student_id: user.uid,
       status: 'in_progress',
       started_at: now,
+      submitted_at: null,
+      time_spent_seconds: null,
+      score: null,
+      percentage: null,
+      violations_count: 0,
+      violations_data: [],
+      ai_analysis: null,
       created_at: now,
-    } as Database['public']['Tables']['exam_attempts']['Insert'])
+    } as any)
 
     const snap = await getDoc(ref)
     return normalizeId<ExamAttempt>(snap.id, snap.data())
