@@ -10,7 +10,15 @@ import {
   updateProfile,
   type UserCredential,
 } from 'firebase/auth'
-import { collection, doc, getDoc, setDoc } from 'firebase/firestore'
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/lib/firebase'
 
 interface Profile {
@@ -165,6 +173,12 @@ export const useAuthStore = create<AuthState>()(
           const snapshot = await getDoc(profileRef)
 
           if (!snapshot.exists()) {
+            // Kiểm tra xem đã có admin nào trong hệ thống chưa
+            const adminsSnap = await getDocs(
+              query(profilesCol, where('role', '==', 'admin'))
+            )
+            const isFirstAdmin = adminsSnap.empty
+
             const newProfile: Profile = {
               id: user.uid,
               email: user.email,
@@ -172,7 +186,8 @@ export const useAuthStore = create<AuthState>()(
                 user.displayName ||
                 user.email?.split('@')[0] ||
                 'User',
-              role: 'student',
+              // Nếu chưa có admin nào, user đầu tiên sẽ là admin
+              role: isFirstAdmin ? 'admin' : 'student',
               student_code: null,
               teacher_code: null,
               class_id: null,
