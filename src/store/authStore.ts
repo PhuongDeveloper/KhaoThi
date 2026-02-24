@@ -18,6 +18,7 @@ import {
   getDocs,
   query,
   where,
+  Timestamp,
 } from 'firebase/firestore'
 import { auth, googleProvider, db } from '@/lib/firebase'
 
@@ -93,11 +94,20 @@ export const useAuthStore = create<AuthState>()(
           // Fetch profile ngay lập tức và lấy kết quả trực tiếp
           let profileData: Profile | null = null
           if (user) {
-            profileData = await get().fetchProfile()
+            try {
+              profileData = await get().fetchProfile()
+              if (!profileData) {
+                console.warn('[AuthStore] fetchProfile trả về null sau khi đăng nhập')
+              }
+            } catch (profileError: any) {
+              console.error('[AuthStore] Lỗi khi fetch profile sau đăng nhập:', profileError)
+              throw new Error(`Đăng nhập thành công nhưng không thể tải profile: ${profileError.message}`)
+            }
           }
 
           return { profile: profileData }
         } catch (error: any) {
+          console.error('[AuthStore] Lỗi đăng nhập:', error)
           throw new Error(error.message || 'Đăng nhập thất bại')
         } finally {
           set({ loading: false })
@@ -110,9 +120,15 @@ export const useAuthStore = create<AuthState>()(
           const user = cred.user
           set({ user, session: null })
           if (user) {
-            await get().fetchProfile()
+            try {
+              await get().fetchProfile()
+            } catch (profileError: any) {
+              console.error('[AuthStore] Lỗi khi fetch profile sau Google login:', profileError)
+              throw new Error(`Đăng nhập Google thành công nhưng không thể tải profile: ${profileError.message}`)
+            }
           }
         } catch (error: any) {
+          console.error('[AuthStore] Lỗi đăng nhập Google:', error)
           throw new Error(error.message || 'Đăng nhập với Google thất bại')
         }
       },
@@ -128,9 +144,15 @@ export const useAuthStore = create<AuthState>()(
 
           set({ session: null, user })
           if (user) {
-            await get().fetchProfile()
+            try {
+              await get().fetchProfile()
+            } catch (profileError: any) {
+              console.error('[AuthStore] Lỗi khi fetch profile sau đăng ký:', profileError)
+              throw new Error(`Đăng ký thành công nhưng không thể tải profile: ${profileError.message}`)
+            }
           }
         } catch (error: any) {
+          console.error('[AuthStore] Lỗi đăng ký:', error)
           throw new Error(error.message || 'Đăng ký thất bại')
         } finally {
           set({ loading: false })
@@ -173,13 +195,24 @@ export const useAuthStore = create<AuthState>()(
           const snapshot = await getDoc(profileRef)
 
           if (!snapshot.exists()) {
+            console.log('[AuthStore] Profile không tồn tại, đang tạo mới...')
+            
             // Kiểm tra xem đã có admin nào trong hệ thống chưa
-            const adminsSnap = await getDocs(
-              query(profilesCol, where('role', '==', 'admin'))
-            )
-            const isFirstAdmin = adminsSnap.empty
+            let isFirstAdmin = true
+            try {
+              const adminsSnap = await getDocs(
+                query(profilesCol, where('role', '==', 'admin'))
+              )
+              isFirstAdmin = adminsSnap.empty
+              console.log('[AuthStore] Đã có admin:', !isFirstAdmin)
+            } catch (adminCheckError) {
+              console.error('[AuthStore] Lỗi khi kiểm tra admin:', adminCheckError)
+              // Nếu lỗi khi check admin, mặc định là admin (an toàn hơn)
+              isFirstAdmin = true
+            }
 
-            const newProfile: Profile = {
+            const now = Timestamp.fromDate(new Date())
+            const newProfileData = {
               id: user.uid,
               email: user.email,
               full_name:
@@ -191,19 +224,52 @@ export const useAuthStore = create<AuthState>()(
               student_code: null,
               teacher_code: null,
               class_id: null,
+              created_at: now,
+              updated_at: now,
             }
 
-            await setDoc(profileRef, newProfile)
+            console.log('[AuthStore] Đang tạo profile với role:', newProfileData.role)
+            
+            // Tạo profile trong Firestore
+            await setDoc(profileRef, newProfileData)
+            
+            console.log('[AuthStore] Đã tạo profile thành công trong Firestore')
+
+            const newProfile: Profile = {
+              id: newProfileData.id,
+              email: newProfileData.email,
+              full_name: newProfileData.full_name,
+              role: newProfileData.role as 'admin' | 'teacher' | 'student',
+              student_code: newProfileData.student_code,
+              teacher_code: newProfileData.teacher_code,
+              class_id: newProfileData.class_id,
+            }
+
             set({ profile: newProfile })
             return newProfile
           } else {
-            const data = snapshot.data() as Profile
-            set({ profile: data })
-            return data
+            const data = snapshot.data()
+            const profile: Profile = {
+              id: data.id || user.uid,
+              email: data.email || user.email,
+              full_name: data.full_name || user.displayName || 'User',
+              role: (data.role as 'admin' | 'teacher' | 'student') || 'student',
+              student_code: data.student_code || null,
+              teacher_code: data.teacher_code || null,
+              class_id: data.class_id || null,
+            }
+            set({ profile })
+            return profile
           }
-        } catch {
-          if (currentProfile) return currentProfile
-          return null
+        } catch (error: any) {
+          console.error('[AuthStore] Lỗi khi fetch/create profile:', error)
+          // Nếu có lỗi nhưng đã có profile trong state, trả về profile đó
+          if (currentProfile) {
+            console.log('[AuthStore] Sử dụng profile từ cache')
+            return currentProfile
+          }
+          // Nếu không có profile và có lỗi, throw error để UI biết
+          throw new Error(`Không thể tạo/tải profile: ${error.message || 'Unknown error'}`)
         }
       },
     }),
