@@ -207,17 +207,7 @@ export default function Layout({ children }: LayoutProps) {
             <p className="text-sm text-gray-600">
               © 2025 Hệ thống Thi trắc nghiệm PTDTNT ATK Sơn Dương
             </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Phát triển bởi{' '}
-              <a 
-                href="https://www.facebook.com/phuongdeveloper/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-primary-600 hover:text-primary-700 hover:underline"
-              >
-                PhuongDev
-              </a>
-            </p>
+            {/* Tạm ẩn credit theo yêu cầu */}
           </div>
         </div>
       </footer>

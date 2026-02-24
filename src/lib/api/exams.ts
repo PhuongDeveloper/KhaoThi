@@ -7,7 +7,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  limit,
   orderBy,
   query,
   updateDoc,
@@ -45,17 +44,26 @@ export const examApi = {
   // Exams
   async getExams(filters?: { status?: string; subjectId?: string }) {
     const examsCol = collection(db, 'exams')
-    const constraints: any[] = [orderBy('created_at', 'desc')]
+    // Tránh composite index: nếu có filter thì bỏ orderBy trong query, sort ở client
+    const hasFilters = !!(filters?.status || filters?.subjectId)
+    const constraints: any[] = []
 
     if (filters?.status) constraints.push(where('status', '==', filters.status))
     if (filters?.subjectId) constraints.push(where('subject_id', '==', filters.subjectId))
 
-    const q = query(examsCol, ...constraints)
+    const q = hasFilters
+      ? query(examsCol, ...constraints)
+      : query(examsCol, orderBy('created_at', 'desc'))
     const snapshot = await getDocs(q)
     if (snapshot.empty) return []
 
     const exams: any[] = []
     snapshot.forEach((docSnap) => exams.push(normalizeId<Exam>(docSnap.id, docSnap.data())))
+
+    // Sort client-side để đảm bảo consistent (mới nhất trước)
+    if (hasFilters) {
+      exams.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    }
 
     const subjectIds = [...new Set(exams.map((e) => e.subject_id).filter(Boolean))]
     const teacherIds = [...new Set(exams.map((e) => e.teacher_id).filter(Boolean))]
@@ -162,26 +170,23 @@ export const examApi = {
 
   // Questions
   async getQuestions(examId: string) {
-    const qSnap = await getDocs(
-      query(
-        collection(db, 'questions'),
-        where('exam_id', '==', examId),
-        orderBy('order_index', 'asc')
-      )
-    )
+    // Tránh composite index (where + orderBy): chỉ where rồi sort ở client
+    const qSnap = await getDocs(query(collection(db, 'questions'), where('exam_id', '==', examId)))
 
     const questions: QuestionWithAnswers[] = []
-    for (const qDoc of qSnap.docs) {
-      const question = normalizeId<Question>(qDoc.id, qDoc.data())
+    const questionDocs = qSnap.docs
+      .map((qDoc) => normalizeId<Question>(qDoc.id, qDoc.data()))
+      .sort((a, b) => ((a.order_index ?? 1e9) as number) - ((b.order_index ?? 1e9) as number))
+
+    for (const question of questionDocs) {
+      // Tránh composite index (where + orderBy): chỉ where rồi sort ở client
       const ansSnap = await getDocs(
-        query(
-          collection(db, 'answers'),
-          where('question_id', '==', question.id),
-          orderBy('order_index', 'asc')
-        )
+        query(collection(db, 'answers'), where('question_id', '==', question.id))
       )
-      const answers: Answer[] = []
-      ansSnap.forEach((a) => answers.push(normalizeId<Answer>(a.id, a.data())))
+      const answers: Answer[] = ansSnap.docs
+        .map((a) => normalizeId<Answer>(a.id, a.data()))
+        .sort((a, b) => ((a.order_index ?? 1e9) as number) - ((b.order_index ?? 1e9) as number))
+
       questions.push({ ...question, answers })
     }
 
@@ -432,19 +437,16 @@ export const examApi = {
       if (cached) return cached
     }
 
+    // Tránh composite index (where + orderBy): chỉ where rồi sort & slice ở client
     const assignmentsSnap = await getDocs(
-      query(
-        collection(db, 'exam_assignments'),
-        where('student_id', '==', currentStudentId),
-        orderBy('assigned_at', 'desc'),
-        limit(20)
-      )
+      query(collection(db, 'exam_assignments'), where('student_id', '==', currentStudentId))
     )
     if (assignmentsSnap.empty) return []
 
-    const assignments = assignmentsSnap.docs.map((d) =>
-      normalizeId<any>(d.id, d.data())
-    )
+    const assignments = assignmentsSnap.docs
+      .map((d) => normalizeId<any>(d.id, d.data()))
+      .sort((a, b) => new Date(b.assigned_at || 0).getTime() - new Date(a.assigned_at || 0).getTime())
+      .slice(0, 20)
 
     const examIds = [...new Set(assignments.map((a) => a.exam_id).filter(Boolean))]
     if (examIds.length === 0) return []
@@ -864,7 +866,8 @@ export const examApi = {
       if (cached) return cached
     }
 
-    const constraints: any[] = [orderBy('created_at', 'desc')]
+    // Tránh composite index (where + orderBy): chỉ where rồi sort ở client
+    const constraints: any[] = []
     if (examId && (userRole === 'admin' || userRole === 'teacher')) {
       constraints.push(where('exam_id', '==', examId))
     } else {
@@ -879,6 +882,7 @@ export const examApi = {
     attemptsSnap.forEach((a) =>
       attempts.push(normalizeId<ExamAttempt>(a.id, a.data()))
     )
+    attempts.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
 
     const examIds = [...new Set(attempts.map((a) => a.exam_id).filter(Boolean))]
     const examsMap: Record<string, any> = {}
