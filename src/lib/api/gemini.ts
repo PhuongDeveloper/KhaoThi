@@ -1,4 +1,15 @@
-import { supabase } from '../supabase'
+import { db } from '../firebase'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  query,
+  where,
+  Timestamp,
+} from 'firebase/firestore'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
@@ -48,32 +59,41 @@ export interface ExamAnalysis {
 const MAX_DAILY_API_CALLS = 100
 
 async function checkApiLimit(teacherId: string): Promise<boolean> {
-  const today = new Date().toISOString().split('T')[0]
-  const { data, error } = await supabase
-    .from('ai_question_generations')
-    .select('api_calls_count')
-    .eq('teacher_id', teacherId)
-    .gte('created_at', `${today}T00:00:00.000Z`)
-    .lte('created_at', `${today}T23:59:59.999Z`)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
 
-  if (error) {
+  const generationsCol = collection(db, 'ai_question_generations')
+  const q = query(
+    generationsCol,
+    where('teacher_id', '==', teacherId),
+    where('created_at', '>=', Timestamp.fromDate(today)),
+    where('created_at', '<', Timestamp.fromDate(tomorrow))
+  )
+
+  try {
+    const snapshot = await getDocs(q)
+    const totalCalls =
+      snapshot.docs.reduce((sum, doc) => {
+        const data = doc.data()
+        return sum + (data.api_calls_count || 0)
+      }, 0) || 0
+    return totalCalls < MAX_DAILY_API_CALLS
+  } catch (error) {
     return false
   }
-
-  const totalCalls = data?.reduce((sum, item) => sum + item.api_calls_count, 0) || 0
-  return totalCalls < MAX_DAILY_API_CALLS
 }
 
 async function recordApiCall(teacherId: string, examId: string, calls: number = 1) {
-  await supabase
-    .from('ai_question_generations')
-    .insert({
-      teacher_id: teacherId,
-      exam_id: examId,
-      api_calls_count: calls,
-      input_text: '',
-      generated_questions: null,
-    })
+  await addDoc(collection(db, 'ai_question_generations'), {
+    teacher_id: teacherId,
+    exam_id: examId,
+    api_calls_count: calls,
+    input_text: '',
+    generated_questions: null,
+    created_at: Timestamp.fromDate(new Date()),
+  })
 }
 
 // Hàm chuyển file sang base64
@@ -370,15 +390,12 @@ export async function generateQuestions(
   }
 
   // Lấy teacher_id từ exam
-  const { data: exam } = await supabase
-    .from('exams')
-    .select('teacher_id')
-    .eq('id', request.examId)
-    .single()
-
-  if (!exam) {
+  const examDoc = await getDoc(doc(db, 'exams', request.examId))
+  if (!examDoc.exists()) {
     throw new Error('Exam not found')
   }
+
+  const exam = examDoc.data()
 
   // Kiểm tra giới hạn API
   const canCall = await checkApiLimit(exam.teacher_id)
@@ -464,15 +481,12 @@ export async function analyzeExamResults(
     throw new Error('Gemini API key not configured')
   }
 
-  const { data: exam } = await supabase
-    .from('exams')
-    .select('teacher_id, title, duration_minutes, total_questions')
-    .eq('id', request.examId)
-    .single()
-
-  if (!exam) {
+  const examDoc = await getDoc(doc(db, 'exams', request.examId))
+  if (!examDoc.exists()) {
     throw new Error('Exam not found')
   }
+
+  const exam = examDoc.data()
 
   const prompt = `Phân tích kết quả bài thi với thông tin sau:
 
@@ -530,10 +544,8 @@ Chỉ trả về JSON, không có text thêm.`
     const analysis: ExamAnalysis = JSON.parse(jsonMatch[0])
 
     // Lưu phân tích vào database
-    await supabase
-      .from('exam_attempts')
-      .update({ ai_analysis: analysis })
-      .eq('id', request.attemptId)
+    const attemptRef = doc(db, 'exam_attempts', request.attemptId)
+    await updateDoc(attemptRef, { ai_analysis: analysis })
 
     return analysis
   } catch (error) {

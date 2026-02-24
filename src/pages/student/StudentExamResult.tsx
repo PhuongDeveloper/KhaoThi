@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react'
@@ -42,10 +43,15 @@ export default function StudentExamResult() {
       setAttempt(myAttempt)
 
       // Lấy responses
-      const { data: responsesData } = await supabase
-        .from('exam_responses')
-        .select('*')
-        .eq('attempt_id', myAttempt.id)
+      const responsesQuery = query(
+        collection(db, 'exam_responses'),
+        where('attempt_id', '==', myAttempt.id)
+      )
+      const responsesSnap = await getDocs(responsesQuery)
+      const responsesData = responsesSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
 
       setResponses(responsesData || [])
     } catch (error: any) {

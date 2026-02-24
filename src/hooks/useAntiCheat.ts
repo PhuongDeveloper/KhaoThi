@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { db } from '../lib/firebase'
+import { doc, getDoc, updateDoc } from 'firebase/firestore'
 
 export interface Violation {
   type: string
@@ -44,23 +45,16 @@ export function useAntiCheat(options: UseAntiCheatOptions = {}) {
     // Lưu violation vào database nếu có attemptId
     if (attemptId) {
       try {
-        const { data: attempt } = await supabase
-          .from('exam_attempts')
-          .select('violations_data, violations_count')
-          .eq('id', attemptId)
-          .single()
-
-        if (attempt) {
+        const attemptDoc = await getDoc(doc(db, 'exam_attempts', attemptId))
+        if (attemptDoc.exists()) {
+          const attempt = attemptDoc.data()
           const existingViolations = (attempt.violations_data as any[]) || []
           const updatedViolations = [...existingViolations, violation]
           
-          await supabase
-            .from('exam_attempts')
-            .update({
-              violations_data: updatedViolations,
-              violations_count: updatedViolations.length,
-            })
-            .eq('id', attemptId)
+          await updateDoc(doc(db, 'exam_attempts', attemptId), {
+            violations_data: updatedViolations,
+            violations_count: updatedViolations.length,
+          })
         }
       } catch (error) {
         // Ignore errors

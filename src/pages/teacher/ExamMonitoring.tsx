@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, onSnapshot, getDocs, orderBy, updateDoc, doc } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { Eye, AlertTriangle, User, Ban } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -29,12 +30,6 @@ export default function ExamMonitoring() {
   useEffect(() => {
     if (id) {
       fetchData()
-    }
-
-    return () => {
-      // Cleanup subscription
-      const channel = supabase.channel(`exam-monitoring-${id}`)
-      supabase.removeChannel(channel)
     }
   }, [id])
 
@@ -70,63 +65,47 @@ export default function ExamMonitoring() {
     if (!id || activeAttempts.length === 0) return () => {}
 
     // Subscribe to exam_attempts changes
-    const channel = supabase
-      .channel(`exam-monitoring-${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'exam_attempts',
-          filter: `exam_id=eq.${id}`,
-        },
-          () => {
-            fetchData()
-          }
-      )
-      .subscribe()
+    const attemptsQuery = query(
+      collection(db, 'exam_attempts'),
+      where('exam_id', '==', id)
+    )
+    const unsubscribeAttempts = onSnapshot(attemptsQuery, () => {
+      fetchData()
+    })
 
     // Subscribe to responses changes cho từng attempt
-    const responseChannels: any[] = []
+    const unsubscribes: (() => void)[] = []
     activeAttempts.forEach((attempt) => {
-      const responseChannel = supabase
-        .channel(`exam-responses-${attempt.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'exam_responses',
-            filter: `attempt_id=eq.${attempt.id}`,
-          },
-          () => {
-            if (selectedAttempt?.id === attempt.id) {
-              loadAttemptDetails(attempt.id)
-            }
-          }
-        )
-        .subscribe()
-      responseChannels.push(responseChannel)
+      const responsesQuery = query(
+        collection(db, 'exam_responses'),
+        where('attempt_id', '==', attempt.id)
+      )
+      const unsubscribe = onSnapshot(responsesQuery, () => {
+        if (selectedAttempt?.id === attempt.id) {
+          loadAttemptDetails(attempt.id)
+        }
+      })
+      unsubscribes.push(unsubscribe)
     })
 
     return () => {
-      supabase.removeChannel(channel)
-      responseChannels.forEach((responseChannel) => {
-        supabase.removeChannel(responseChannel)
-      })
+      unsubscribeAttempts()
+      unsubscribes.forEach((unsub) => unsub())
     }
   }
 
   const loadAttemptDetails = async (attemptId: string) => {
     try {
-      const { data: responsesData } = await supabase
-        .from('exam_responses')
-        .select('*')
-        .eq('attempt_id', attemptId)
-        .order('created_at', { ascending: true })
+      const responsesQuery = query(
+        collection(db, 'exam_responses'),
+        where('attempt_id', '==', attemptId),
+        orderBy('created_at', 'asc')
+      )
+      const responsesSnap = await getDocs(responsesQuery)
 
       const responsesMap: Record<string, any[]> = {}
-      responsesData?.forEach((r: any) => {
+      responsesSnap.forEach((docSnap) => {
+        const r = { id: docSnap.id, ...docSnap.data() }
         if (!responsesMap[r.question_id]) {
           responsesMap[r.question_id] = []
         }
@@ -162,15 +141,11 @@ export default function ExamMonitoring() {
 
     try {
       // Update attempt status to 'violation'
-      const { error } = await supabase
-        .from('exam_attempts')
-        .update({
-          status: 'violation',
-          submitted_at: new Date().toISOString(),
-        })
-        .eq('id', attempt.id)
-
-      if (error) throw error
+      const attemptRef = doc(db, 'exam_attempts', attempt.id)
+      await updateDoc(attemptRef, {
+        status: 'violation',
+        submitted_at: new Date().toISOString(),
+      })
 
       // Submit the exam với status violation
       await examApi.submitExam(attempt.id, attempt.time_spent_seconds || 0, attempt.violations_data || [], 'violation')

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, getDocs } from 'firebase/firestore'
 import { Users, BookOpen, FileText, BarChart3 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
@@ -18,35 +19,18 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const usersResult = await supabase.from('profiles').select('id', { count: 'exact', head: true })
-      const subjectsResult = await supabase.from('subjects').select('id', { count: 'exact', head: true })
-      
-      let examsResult = { count: 0 }
-      let attemptsResult = { count: 0 }
-      
-      try {
-        const exams = await supabase.from('exams').select('id', { count: 'exact', head: true })
-        if (!exams.error && exams.count !== null) {
-          examsResult = { count: exams.count }
-        }
-      } catch (e) {
-        // Ignore errors
-      }
-      
-      try {
-        const attempts = await supabase.from('exam_attempts').select('id', { count: 'exact', head: true })
-        if (!attempts.error && attempts.count !== null) {
-          attemptsResult = { count: attempts.count }
-        }
-      } catch (e) {
-        // Ignore errors
-      }
+      const [usersSnap, subjectsSnap, examsSnap, attemptsSnap] = await Promise.all([
+        getDocs(collection(db, 'profiles')),
+        getDocs(collection(db, 'subjects')),
+        getDocs(collection(db, 'exams')),
+        getDocs(collection(db, 'exam_attempts')),
+      ])
 
       setStats({
-        users: usersResult.count || 0,
-        subjects: subjectsResult.count || 0,
-        exams: examsResult.count || 0,
-        attempts: attemptsResult.count || 0,
+        users: usersSnap.size || 0,
+        subjects: subjectsSnap.size || 0,
+        exams: examsSnap.size || 0,
+        attempts: attemptsSnap.size || 0,
       })
     } catch (error) {
       // Ignore errors

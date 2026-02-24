@@ -1,60 +1,80 @@
-import { supabase } from '../supabase'
+import { db } from '../firebase'
 import type { Database } from '../supabase'
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  Timestamp,
+} from 'firebase/firestore'
 
 type Subject = Database['public']['Tables']['subjects']['Row']
 
 export const subjectApi = {
   async getAll() {
-    const { data, error } = await supabase
-      .from('subjects')
-      .select('*')
-      .order('name', { ascending: true })
+    const subjectsCol = collection(db, 'subjects')
+    const q = query(subjectsCol, orderBy('name', 'asc'))
+    const snapshot = await getDocs(q)
 
-    if (error) throw error
-    return data as Subject[]
+    if (snapshot.empty) return []
+
+    const subjects: Subject[] = []
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data()
+      subjects.push({
+        id: docSnap.id,
+        ...data,
+        created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+        updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+      } as Subject)
+    })
+
+    return subjects
   },
 
   async getById(id: string) {
-    const { data, error } = await supabase
-      .from('subjects')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const subjectDoc = await getDoc(doc(db, 'subjects', id))
+    if (!subjectDoc.exists()) {
+      throw new Error('Subject not found')
+    }
 
-    if (error) throw error
-    return data as Subject
+    const data = subjectDoc.data()
+    return {
+      id: subjectDoc.id,
+      ...data,
+      created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+      updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+    } as Subject
   },
 
   async create(subject: Database['public']['Tables']['subjects']['Insert']) {
-    const { data, error } = await supabase
-      .from('subjects')
-      .insert(subject)
-      .select()
-      .single()
+    const now = new Date().toISOString()
+    const newSubject = {
+      ...subject,
+      created_at: Timestamp.fromDate(new Date(now)),
+      updated_at: Timestamp.fromDate(new Date(now)),
+    }
 
-    if (error) throw error
-    return data as Subject
+    const docRef = await addDoc(collection(db, 'subjects'), newSubject)
+    return this.getById(docRef.id)
   },
 
   async update(id: string, subject: Database['public']['Tables']['subjects']['Update']) {
-    const { data, error } = await supabase
-      .from('subjects')
-      .update(subject)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as Subject
+    const subjectRef = doc(db, 'subjects', id)
+    await updateDoc(subjectRef, {
+      ...subject,
+      updated_at: Timestamp.fromDate(new Date()),
+    } as any)
+    return this.getById(id)
   },
 
   async delete(id: string) {
-    const { error } = await supabase
-      .from('subjects')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
+    await deleteDoc(doc(db, 'subjects', id))
   },
 }
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { Users, Eye } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -64,15 +65,16 @@ export default function TeacherExamResults() {
       
       for (const attempt of attempts) {
         if (attempt.status === 'submitted' || attempt.status === 'timeout') {
-          const { data: responses } = await supabase
-            .from('exam_responses')
-            .select('*')
-            .eq('attempt_id', attempt.id)
-            .eq('question_id', question.id)
+          const responsesQuery = query(
+            collection(db, 'exam_responses'),
+            where('attempt_id', '==', attempt.id),
+            where('question_id', '==', question.id)
+          )
+          const responsesSnap = await getDocs(responsesQuery)
           
-          if (responses && responses.length > 0) {
+          if (!responsesSnap.empty) {
             totalCount++
-            const isCorrect = responses.some((r: any) => r.is_correct)
+            const isCorrect = responsesSnap.docs.some((doc) => doc.data().is_correct)
             if (isCorrect) {
               correctCount++
             }

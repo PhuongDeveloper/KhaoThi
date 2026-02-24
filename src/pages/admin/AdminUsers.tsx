@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { userApi } from '../../lib/api/users'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { doc, deleteDoc } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { Edit, Trash2, Users } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -81,13 +82,7 @@ export default function AdminUsers() {
     if (!confirmed) return
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', id)
-
-      if (error) throw error
-
+      await deleteDoc(doc(db, 'profiles', id))
       toast.success('Xóa người dùng thành công')
       fetchUsers()
     } catch (error: any) {

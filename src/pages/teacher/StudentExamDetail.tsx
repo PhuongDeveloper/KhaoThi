@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { CheckCircle, XCircle, ArrowLeft, User } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -35,13 +36,15 @@ export default function StudentExamDetail() {
         examApi.getAttempt(attemptId!),
       ])
 
-      const { data: responsesData } = await supabase
-        .from('exam_responses')
-        .select('*')
-        .eq('attempt_id', attemptId!)
+      const responsesQuery = query(
+        collection(db, 'exam_responses'),
+        where('attempt_id', '==', attemptId!)
+      )
+      const responsesSnap = await getDocs(responsesQuery)
 
       const responsesMap: Record<string, any> = {}
-      responsesData?.forEach((r: any) => {
+      responsesSnap.forEach((docSnap) => {
+        const r = { id: docSnap.id, ...docSnap.data() }
         if (r.question_id) {
           if (!responsesMap[r.question_id]) {
             responsesMap[r.question_id] = []

@@ -4,7 +4,8 @@ import { useAuthStore } from '../../store/authStore'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { CheckCircle, XCircle, History } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { cache, CACHE_KEYS } from '../../lib/cache'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
@@ -22,29 +23,21 @@ export default function StudentHistory() {
 
     // Setup realtime subscription và auto-refresh
     if (profile?.id) {
-      const channel = supabase
-        .channel(`student-history-attempts-${profile.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'exam_attempts',
-            filter: `student_id=eq.${profile.id}`,
-          },
-          () => {
-            cache.invalidate(CACHE_KEYS.attempts(profile.id))
-            fetchHistory()
-          }
-        )
-        .subscribe()
+      const attemptsQuery = query(
+        collection(db, 'exam_attempts'),
+        where('student_id', '==', profile.id)
+      )
+      const unsubscribe = onSnapshot(attemptsQuery, () => {
+        cache.invalidate(CACHE_KEYS.attempts(profile.id))
+        fetchHistory()
+      })
 
       const refreshInterval = setInterval(() => {
         fetchHistory()
       }, 30000)
 
       return () => {
-        supabase.removeChannel(channel)
+        unsubscribe()
         clearInterval(refreshInterval)
       }
     }

@@ -4,7 +4,8 @@ import { useAuthStore } from '../../store/authStore'
 import { getMyClass } from '../../lib/api/classes'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { ClipboardList, CheckCircle, RefreshCw, BookOpen, TrendingUp, AlertCircle, ArrowRight } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { cache, CACHE_KEYS } from '../../lib/cache'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -41,46 +42,30 @@ export default function StudentDashboard() {
     }
 
     if (profile?.id) {
-      const assignmentsChannel = supabase
-        .channel('student-assignments')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'exam_assignments',
-            filter: `student_id=eq.${profile.id}`,
-          },
-          () => {
-            fetchData()
-          }
-        )
-        .subscribe()
+      const assignmentsQuery = query(
+        collection(db, 'exam_assignments'),
+        where('student_id', '==', profile.id)
+      )
+      const unsubscribeAssignments = onSnapshot(assignmentsQuery, () => {
+        fetchData()
+      })
 
-      const attemptsChannel = supabase
-        .channel(`student-attempts-${profile.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'exam_attempts',
-            filter: `student_id=eq.${profile.id}`,
-          },
-          () => {
-            cache.invalidate(CACHE_KEYS.attempts(profile.id))
-            fetchData()
-          }
-        )
-        .subscribe()
+      const attemptsQuery = query(
+        collection(db, 'exam_attempts'),
+        where('student_id', '==', profile.id)
+      )
+      const unsubscribeAttempts = onSnapshot(attemptsQuery, () => {
+        cache.invalidate(CACHE_KEYS.attempts(profile.id))
+        fetchData()
+      })
 
       const refreshInterval = setInterval(() => {
         fetchData()
       }, 30000)
 
       return () => {
-        supabase.removeChannel(assignmentsChannel)
-        supabase.removeChannel(attemptsChannel)
+        unsubscribeAssignments()
+        unsubscribeAttempts()
         clearInterval(refreshInterval)
       }
     }

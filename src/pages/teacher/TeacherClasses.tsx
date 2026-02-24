@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getMyHomeroomClasses, getClassStudents, addStudentToClass, removeStudentFromClass, type Class, type ClassStudent } from '../../lib/api/classes'
-import { supabase } from '../../lib/supabase'
+import { userApi } from '../../lib/api/users'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
@@ -48,16 +48,16 @@ export default function TeacherClasses() {
 
   const fetchAllStudents = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, student_code, class_id')
-        .eq('role', 'student')
-        .order('full_name')
-      
-      if (error) throw error
-      setAllStudents(data || [])
+      const studentsData = await userApi.getAll({ role: 'student' })
+      setAllStudents(studentsData.map((s: any) => ({
+        id: s.id,
+        full_name: s.full_name,
+        email: s.email,
+        student_code: s.student_code,
+        class_id: s.class_id,
+      })))
     } catch (error: any) {
-      toast.error('Lỗi khi tải danh sách học sinh: ' + error.message)
+      toast.error('Lỗi khi tải danh sách học sinh: ' + (error.message || 'Unknown error'))
     }
   }
 

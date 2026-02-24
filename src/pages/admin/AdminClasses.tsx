@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getClasses, createClass, updateClass, deleteClass, type Class, type CreateClassData } from '../../lib/api/classes'
-import { supabase } from '../../lib/supabase'
+import { userApi } from '../../lib/api/users'
 import toast from 'react-hot-toast'
 import { Users } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
@@ -36,14 +36,12 @@ export default function AdminClasses() {
       const classesData = await getClasses()
       setClasses(classesData)
       
-      const { data: teachersData, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email')
-        .eq('role', 'teacher')
-        .order('full_name')
-      
-      if (error) throw error
-      setTeachers(teachersData || [])
+      const teachersData = await userApi.getAll({ role: 'teacher' })
+      setTeachers(teachersData.map((t: any) => ({
+        id: t.id,
+        full_name: t.full_name,
+        email: t.email,
+      })))
     } catch (error: any) {
       toast.error('Lỗi khi tải dữ liệu: ' + error.message)
     } finally {

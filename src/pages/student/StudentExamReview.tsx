@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { CheckCircle, XCircle, ArrowLeft, Clock, AlertCircle } from 'lucide-react'
@@ -50,10 +51,15 @@ export default function StudentExamReview() {
 
       // Kiểm tra 2: Tất cả học sinh đã nộp bài chưa?
       // Lấy tất cả attempts của bài thi này
-      const { data: allAttempts } = await supabase
-        .from('exam_attempts')
-        .select('id, status')
-        .eq('exam_id', id!)
+      const attemptsQuery = query(
+        collection(db, 'exam_attempts'),
+        where('exam_id', '==', id!)
+      )
+      const allAttemptsSnap = await getDocs(attemptsQuery)
+      const allAttempts = allAttemptsSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }))
 
       if (allAttempts && allAttempts.length > 0) {
         // Kiểm tra xem còn attempt nào đang in_progress không
@@ -102,14 +108,16 @@ export default function StudentExamReview() {
         return
       }
 
-      const { data: responsesData } = await supabase
-        .from('exam_responses')
-        .select('*')
-        .eq('attempt_id', myAttempt.id)
+      const responsesQuery = query(
+        collection(db, 'exam_responses'),
+        where('attempt_id', '==', myAttempt.id)
+      )
+      const responsesSnap = await getDocs(responsesQuery)
 
       // Với true_false_multi, mỗi question có thể có nhiều responses (mỗi answer một response)
       const responsesMap: Record<string, any[]> = {}
-      responsesData?.forEach((r: any) => {
+      responsesSnap.forEach((doc) => {
+        const r = { id: doc.id, ...doc.data() }
         if (!responsesMap[r.question_id]) {
           responsesMap[r.question_id] = []
         }

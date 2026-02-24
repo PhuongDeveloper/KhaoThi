@@ -1,7 +1,17 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { User, Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import {
+  User as FirebaseUser,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  updateProfile,
+  type UserCredential,
+} from 'firebase/auth'
+import { collection, doc, getDoc, setDoc } from 'firebase/firestore'
+import { auth, googleProvider, db } from '@/lib/firebase'
 
 interface Profile {
   id: string
@@ -14,8 +24,9 @@ interface Profile {
 }
 
 interface AuthState {
-  user: User | null
-  session: Session | null
+  user: FirebaseUser | null
+  // Firebase không có Session như Supabase, giữ kiểu cho tương thích nhưng không dùng
+  session: any | null
   profile: Profile | null
   loading: boolean
   initialized: boolean
@@ -36,239 +47,150 @@ export const useAuthStore = create<AuthState>()(
       loading: false,
       initialized: false,
 
-  initialize: async () => {
-    set({ loading: true })
-    try {
-      const sessionPromise = supabase.auth.getSession()
-      const sessionTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session fetch timeout')), 2000)
-      )
-      
-      const { data: { session }, error } = await Promise.race([
-        sessionPromise,
-        sessionTimeoutPromise
-      ]) as { data: { session: any }, error: any }
-      
-      if (error) {
-        set({ session: null, user: null, profile: null, loading: false, initialized: true })
-        return
-      }
-      
-      set({ session, user: session?.user ?? null })
-
-      if (session?.user) {
+      initialize: async () => {
+        set({ loading: true })
         try {
-          const profilePromise = get().fetchProfile()
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
-          )
-          await Promise.race([profilePromise, timeoutPromise])
-        } catch (profileError) {
-          // Ignore profile fetch errors during init
+          // Firebase giữ session trong client, chỉ cần đọc currentUser
+          const user = auth.currentUser
+          set({ user, session: null })
+
+          if (user) {
+            try {
+              const profilePromise = get().fetchProfile()
+              const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
+              )
+              await Promise.race([profilePromise, timeoutPromise])
+            } catch {
+              // Ignore profile fetch errors during init
+            }
+          } else {
+            set({ profile: null })
+          }
+        } catch {
+          // Ignore initialization errors
+        } finally {
+          set({ loading: false, initialized: true })
         }
-      } else {
-        set({ profile: null })
-      }
-    } catch (error) {
-      // Ignore initialization errors
-    } finally {
-      set({ loading: false, initialized: true })
-    }
-  },
+      },
 
-  signIn: async (email: string, password: string) => {
-    set({ loading: true })
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      signIn: async (email: string, password: string) => {
+        set({ loading: true })
+        try {
+          const cred: UserCredential = await signInWithEmailAndPassword(auth, email, password)
+          const user = cred.user
 
-      if (error) throw error
+          set({ session: null, user })
 
-      set({ session: data.session, user: data.user })
-      
-      // Fetch profile ngay lập tức và lấy kết quả trực tiếp
-      let profileData: Profile | null = null
-      if (data.user) {
-        profileData = await get().fetchProfile()
-      }
-      
-      // Trả về profile để redirect ngay, không lag
-      return { profile: profileData }
-    } catch (error: any) {
-      throw new Error(error.message || 'Đăng nhập thất bại')
-    } finally {
-      set({ loading: false })
-    }
-  },
+          // Fetch profile ngay lập tức và lấy kết quả trực tiếp
+          let profileData: Profile | null = null
+          if (user) {
+            profileData = await get().fetchProfile()
+          }
 
-  signInWithGoogle: async () => {
-    try {
-      const currentOrigin = window.location.origin
-      const redirectUrl = `${currentOrigin}/auth/callback`
-      
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: false,
-          queryParams: {
-            prompt: 'select_account',
-            access_type: 'offline',
-          },
-        },
-      })
-      
-      if (error) throw error
-    } catch (error: any) {
-      throw new Error(error.message || 'Đăng nhập với Google thất bại')
-    }
-  },
+          return { profile: profileData }
+        } catch (error: any) {
+          throw new Error(error.message || 'Đăng nhập thất bại')
+        } finally {
+          set({ loading: false })
+        }
+      },
 
-  signUp: async (email: string, password: string, fullName: string) => {
-    set({ loading: true })
-    try {
-      // Mặc định role là student khi đăng ký
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: 'student', // Luôn là student
-          },
-          emailRedirectTo: `${window.location.origin}/login`,
-        },
-      })
+      signInWithGoogle: async () => {
+        try {
+          const cred = await signInWithPopup(auth, googleProvider)
+          const user = cred.user
+          set({ user, session: null })
+          if (user) {
+            await get().fetchProfile()
+          }
+        } catch (error: any) {
+          throw new Error(error.message || 'Đăng nhập với Google thất bại')
+        }
+      },
 
-      if (error) throw error
+      signUp: async (email: string, password: string, fullName: string) => {
+        set({ loading: true })
+        try {
+          const cred = await createUserWithEmailAndPassword(auth, email, password)
+          const user = cred.user
 
-      set({ session: data.session, user: data.user })
-      if (data.user) {
-        await get().fetchProfile()
-      }
-    } catch (error: any) {
-      throw new Error(error.message || 'Đăng ký thất bại')
-    } finally {
-      set({ loading: false })
-    }
-  },
+          // Cập nhật displayName
+          await updateProfile(user, { displayName: fullName })
 
-  signOut: async () => {
-    set({ loading: true })
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      
-      // Clear tất cả state
-      set({ user: null, session: null, profile: null, initialized: false })
-      
-      // Clear cache
-      if (typeof window !== 'undefined') {
-        const { cache } = await import('../lib/cache')
-        cache.clear()
-      }
-    } catch (error: any) {
-      throw new Error(error.message || 'Đăng xuất thất bại')
-    } finally {
-      set({ loading: false })
-    }
-  },
+          set({ session: null, user })
+          if (user) {
+            await get().fetchProfile()
+          }
+        } catch (error: any) {
+          throw new Error(error.message || 'Đăng ký thất bại')
+        } finally {
+          set({ loading: false })
+        }
+      },
 
-  fetchProfile: async (): Promise<Profile | null> => {
-    const { user } = get()
-    
-    if (!user) {
-      set({ profile: null })
-      return null
-    }
+      signOut: async () => {
+        set({ loading: true })
+        try {
+          await firebaseSignOut(auth)
 
-    const currentProfile = get().profile
+          // Clear tất cả state
+          set({ user: null, session: null, profile: null, initialized: false })
 
-    try {
-      const queryPromise = supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle()
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Profile query timeout after 3s')), 3000)
-      )
-      
-      const { data, error } = await Promise.race([
-        queryPromise,
-        timeoutPromise
-      ]) as { data: any, error: any }
+          // Clear cache
+          if (typeof window !== 'undefined') {
+            const { cache } = await import('../lib/cache')
+            cache.clear()
+          }
+        } catch (error: any) {
+          throw new Error(error.message || 'Đăng xuất thất bại')
+        } finally {
+          set({ loading: false })
+        }
+      },
 
-      if (error) {
-        if (error.message?.includes('timeout')) {
-          if (currentProfile) return currentProfile
+      fetchProfile: async (): Promise<Profile | null> => {
+        const { user } = get()
+
+        if (!user) {
+          set({ profile: null })
           return null
         }
-        if (error.code === 'PGRST116' || error.message?.includes('permission')) {
-          try {
-            const { data: newProfile, error: createError } = await supabase
-              .from('profiles')
-              .insert({
-                id: user.id,
-                email: user.email,
-                full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-                role: user.user_metadata?.role || 'student',
-              })
-              .select()
-              .single()
 
-            if (createError) {
-              if (currentProfile) return currentProfile
-              return null
+        const currentProfile = get().profile
+
+        try {
+          const profilesCol = collection(db, 'profiles')
+          const profileRef = doc(profilesCol, user.uid)
+          const snapshot = await getDoc(profileRef)
+
+          if (!snapshot.exists()) {
+            const newProfile: Profile = {
+              id: user.uid,
+              email: user.email,
+              full_name:
+                user.displayName ||
+                user.email?.split('@')[0] ||
+                'User',
+              role: 'student',
+              student_code: null,
+              teacher_code: null,
+              class_id: null,
             }
 
+            await setDoc(profileRef, newProfile)
             set({ profile: newProfile })
             return newProfile
-          } catch (createErr) {
-            if (currentProfile) return currentProfile
-            return null
+          } else {
+            const data = snapshot.data() as Profile
+            set({ profile: data })
+            return data
           }
-        } else {
-          throw error
-        }
-      }
-
-      if (!data) {
-        try {
-          const { data: newProfile, error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              email: user.email,
-              full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-              role: user.user_metadata?.role || 'student',
-            })
-            .select()
-            .single()
-
-          if (createError) {
-            if (currentProfile) return currentProfile
-            return null
-          }
-
-          set({ profile: newProfile })
-          return newProfile
-        } catch (createErr) {
+        } catch {
           if (currentProfile) return currentProfile
           return null
         }
-      } else {
-        set({ profile: data })
-        return data
-      }
-    } catch (error) {
-      if (currentProfile) return currentProfile
-      return null
-    }
-  },
+      },
     }),
     {
       name: 'auth-storage', // Tên key trong localStorage
@@ -282,11 +204,10 @@ export const useAuthStore = create<AuthState>()(
   )
 )
 
-// Lắng nghe thay đổi auth state
-supabase.auth.onAuthStateChange(async (_event, session) => {
-  useAuthStore.setState({ session, user: session?.user ?? null })
-  if (session?.user) {
-    // Đợi fetchProfile hoàn thành để đảm bảo profile được set
+// Lắng nghe thay đổi auth state từ Firebase
+onAuthStateChanged(auth, async (user) => {
+  useAuthStore.setState({ session: null, user: user ?? null })
+  if (user) {
     await useAuthStore.getState().fetchProfile()
   } else {
     useAuthStore.setState({ profile: null })

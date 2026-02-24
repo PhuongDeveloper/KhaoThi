@@ -4,7 +4,8 @@ import { useAuthStore } from '../../store/authStore'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { RefreshCw, AlertCircle } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { db } from '../../lib/firebase'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { cache, CACHE_KEYS } from '../../lib/cache'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import { useAutoSubmitExams } from '../../hooks/useAutoSubmitExams'
@@ -26,29 +27,21 @@ export default function StudentExams() {
 
     // Setup realtime subscription và auto-refresh
     if (profile?.id) {
-      const channel = supabase
-        .channel(`student-exams-assignments-${profile.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'exam_assignments',
-            filter: `student_id=eq.${profile.id}`,
-          },
-          () => {
-            cache.invalidate(CACHE_KEYS.assignedExams(profile.id))
-            fetchExams()
-          }
-        )
-        .subscribe()
+      const assignmentsQuery = query(
+        collection(db, 'exam_assignments'),
+        where('student_id', '==', profile.id)
+      )
+      const unsubscribe = onSnapshot(assignmentsQuery, () => {
+        cache.invalidate(CACHE_KEYS.assignedExams(profile.id))
+        fetchExams()
+      })
 
       const refreshInterval = setInterval(() => {
         fetchExams()
       }, 30000)
 
       return () => {
-        supabase.removeChannel(channel)
+        unsubscribe()
         clearInterval(refreshInterval)
       }
     }

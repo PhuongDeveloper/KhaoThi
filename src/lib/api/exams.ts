@@ -1,6 +1,19 @@
-import { supabase } from '../supabase'
 import type { Database } from '../supabase'
 import { cache, CACHE_KEYS } from '../cache'
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  updateDoc,
+  where,
+} from 'firebase/firestore'
+import { auth, db } from '../firebase'
 
 type Exam = Database['public']['Tables']['exams']['Row']
 type Question = Database['public']['Tables']['questions']['Row']
@@ -24,73 +37,53 @@ export interface ExamAttemptWithDetails extends ExamAttempt {
   responses_count: number
 }
 
+function normalizeId<T extends { id: string }>(docId: string, data: any): T {
+  return { id: (data.id as string) || docId, ...(data as Omit<T, 'id'>) } as T
+}
+
 export const examApi = {
   // Exams
   async getExams(filters?: { status?: string; subjectId?: string }) {
-    // Query đơn giản, không join để tránh recursion
-    // Sẽ query riêng subjects và profiles nếu cần
-    let query = supabase
-      .from('exams')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const examsCol = collection(db, 'exams')
+    const constraints: any[] = [orderBy('created_at', 'desc')]
 
-    if (filters?.status) {
-      query = query.eq('status', filters.status)
-    }
-    if (filters?.subjectId) {
-      query = query.eq('subject_id', filters.subjectId)
-    }
+    if (filters?.status) constraints.push(where('status', '==', filters.status))
+    if (filters?.subjectId) constraints.push(where('subject_id', '==', filters.subjectId))
 
-    const { data, error } = await query
-    if (error) throw error
+    const q = query(examsCol, ...constraints)
+    const snapshot = await getDocs(q)
+    if (snapshot.empty) return []
 
-    if (!data || data.length === 0) {
-      return []
-    }
+    const exams: any[] = []
+    snapshot.forEach((docSnap) => exams.push(normalizeId<Exam>(docSnap.id, docSnap.data())))
 
-    // Query riêng subjects và profiles để tránh recursion
-    const subjectIds = [...new Set(data.map((e: any) => e.subject_id).filter(Boolean))]
-    const teacherIds = [...new Set(data.map((e: any) => e.teacher_id).filter(Boolean))]
+    const subjectIds = [...new Set(exams.map((e) => e.subject_id).filter(Boolean))]
+    const teacherIds = [...new Set(exams.map((e) => e.teacher_id).filter(Boolean))]
 
-    let subjectsMap: Record<string, any> = {}
-    let profilesMap: Record<string, any> = {}
+    const subjectsMap: Record<string, any> = {}
+    const profilesMap: Record<string, any> = {}
 
     if (subjectIds.length > 0) {
-      try {
-        const { data: subjects } = await supabase
-          .from('subjects')
-          .select('*')
-          .in('id', subjectIds)
-        
-        if (subjects) {
-          subjects.forEach((s: any) => {
-            subjectsMap[s.id] = s
-          })
-        }
-      } catch (e) {
-        // Ignore errors
-      }
+      const subjectsSnap = await getDocs(
+        query(collection(db, 'subjects'), where('id', 'in', subjectIds))
+      )
+      subjectsSnap.forEach((s) => {
+        const data = normalizeId<Database['public']['Tables']['subjects']['Row']>(s.id, s.data())
+        subjectsMap[data.id] = data
+      })
     }
 
     if (teacherIds.length > 0) {
-      try {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', teacherIds)
-        
-        if (profiles) {
-          profiles.forEach((p: any) => {
-            profilesMap[p.id] = p
-          })
-        }
-      } catch (e) {
-        // Ignore errors
-      }
+      const profilesSnap = await getDocs(
+        query(collection(db, 'profiles'), where('id', 'in', teacherIds))
+      )
+      profilesSnap.forEach((p) => {
+        const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(p.id, p.data())
+        profilesMap[data.id] = data
+      })
     }
 
-    // Combine data
-    return data.map((exam: any) => ({
+    return exams.map((exam: any) => ({
       ...exam,
       subject: subjectsMap[exam.subject_id] || null,
       teacher: profilesMap[exam.teacher_id] || null,
@@ -99,90 +92,110 @@ export const examApi = {
   },
 
   async getExamById(id: string) {
-    const { data, error } = await supabase
-      .from('exams')
-      .select(`
-        *,
-        subject:subjects(*),
-        teacher:profiles(*)
-      `)
-      .eq('id', id)
-      .single()
+    const examRef = doc(db, 'exams', id)
+    const examSnap = await getDoc(examRef)
+    if (!examSnap.exists()) throw new Error('Exam not found')
+    const exam = normalizeId<Exam>(examSnap.id, examSnap.data())
 
-    if (error) throw error
-    return data as ExamWithDetails
+    let subject: any = null
+    let teacher: any = null
+
+    if (exam.subject_id) {
+      const subjectSnap = await getDocs(
+        query(collection(db, 'subjects'), where('id', '==', exam.subject_id))
+      )
+      subjectSnap.forEach((s) => {
+        subject = normalizeId<Database['public']['Tables']['subjects']['Row']>(s.id, s.data())
+      })
+    }
+
+    if (exam.teacher_id) {
+      const teacherSnap = await getDocs(
+        query(collection(db, 'profiles'), where('id', '==', exam.teacher_id))
+      )
+      teacherSnap.forEach((t) => {
+        teacher = normalizeId<Database['public']['Tables']['profiles']['Row']>(t.id, t.data())
+      })
+    }
+
+    return {
+      ...exam,
+      subject,
+      teacher,
+      questions_count: exam.total_questions || 0,
+    } as ExamWithDetails
   },
 
   async createExam(exam: Database['public']['Tables']['exams']['Insert']) {
-    // Chuyển chuỗi rỗng thành null cho timestamp fields
+    const now = new Date().toISOString()
     const examData = {
       ...exam,
       start_time: (exam.start_time === '' || exam.start_time === null) ? null : exam.start_time,
       end_time: (exam.end_time === '' || exam.end_time === null) ? null : exam.end_time,
+      created_at: now,
+      updated_at: now,
     }
-    
-    const { data, error } = await supabase
-      .from('exams')
-      .insert(examData)
-      .select()
-      .single()
 
-    if (error) throw error
-    return data as Exam
+    const examsCol = collection(db, 'exams')
+    const docRef = await addDoc(examsCol, examData)
+    const snap = await getDoc(docRef)
+    return normalizeId<Exam>(snap.id, snap.data())
   },
 
   async updateExam(id: string, exam: Database['public']['Tables']['exams']['Update']) {
-    // Chuyển chuỗi rỗng thành null cho timestamp fields
     const examData = {
       ...exam,
       start_time: (exam.start_time === '' || exam.start_time === null || exam.start_time === undefined) ? null : exam.start_time,
       end_time: (exam.end_time === '' || exam.end_time === null || exam.end_time === undefined) ? null : exam.end_time,
+      updated_at: new Date().toISOString(),
     }
-    
-    const { data, error } = await supabase
-      .from('exams')
-      .update(examData)
-      .eq('id', id)
-      .select()
-      .single()
 
-    if (error) throw error
-    return data as Exam
+    const examRef = doc(db, 'exams', id)
+    await updateDoc(examRef, examData as any)
+    const snap = await getDoc(examRef)
+    return normalizeId<Exam>(snap.id, snap.data())
   },
 
   async deleteExam(id: string) {
-    const { error } = await supabase
-      .from('exams')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
+    await deleteDoc(doc(db, 'exams', id))
   },
 
   // Questions
   async getQuestions(examId: string) {
-    const { data, error } = await supabase
-      .from('questions')
-      .select(`
-        *,
-        answers(*)
-      `)
-      .eq('exam_id', examId)
-      .order('order_index', { ascending: true })
+    const qSnap = await getDocs(
+      query(
+        collection(db, 'questions'),
+        where('exam_id', '==', examId),
+        orderBy('order_index', 'asc')
+      )
+    )
 
-    if (error) throw error
-    return data as QuestionWithAnswers[]
+    const questions: QuestionWithAnswers[] = []
+    for (const qDoc of qSnap.docs) {
+      const question = normalizeId<Question>(qDoc.id, qDoc.data())
+      const ansSnap = await getDocs(
+        query(
+          collection(db, 'answers'),
+          where('question_id', '==', question.id),
+          orderBy('order_index', 'asc')
+        )
+      )
+      const answers: Answer[] = []
+      ansSnap.forEach((a) => answers.push(normalizeId<Answer>(a.id, a.data())))
+      questions.push({ ...question, answers })
+    }
+
+    return questions
   },
 
   async createQuestion(question: Database['public']['Tables']['questions']['Insert']) {
-    const { data, error } = await supabase
-      .from('questions')
-      .insert(question)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as Question
+    const now = new Date().toISOString()
+    const ref = await addDoc(collection(db, 'questions'), {
+      ...question,
+      created_at: now,
+    })
+    const snap = await getDoc(ref)
+    return normalizeId<Question>(snap.id, snap.data())
   },
 
   async createQuestionsWithAnswers(
@@ -200,397 +213,270 @@ export const examApi = {
       }>
     }>
   ) {
-    const questionsData = questions.map((q, index) => ({
-      exam_id: examId,
-      content: q.content,
-      question_type: q.question_type || 'multiple_choice',
-      difficulty: q.difficulty,
-      points: q.points,
-      order_index: index + 1,
-      image_url: q.image_url || null,
-      correct_answer: q.correct_answer || null,
-    }))
+    const created: Question[] = []
+    const now = new Date().toISOString()
 
-    const { data: createdQuestions, error: questionsError } = await supabase
-      .from('questions')
-      .insert(questionsData)
-      .select()
+    for (let index = 0; index < questions.length; index++) {
+      const q = questions[index]
+      const qRef = await addDoc(collection(db, 'questions'), {
+        exam_id: examId,
+        content: q.content,
+        question_type: q.question_type || 'multiple_choice',
+        difficulty: q.difficulty,
+        points: q.points,
+        order_index: index + 1,
+        image_url: q.image_url || null,
+        correct_answer: q.correct_answer || null,
+        created_at: now,
+      } as Database['public']['Tables']['questions']['Insert'])
 
-    if (questionsError) throw questionsError
+      const qSnap = await getDoc(qRef)
+      const question = normalizeId<Question>(qSnap.id, qSnap.data())
+      created.push(question)
 
-    const answersData: Database['public']['Tables']['answers']['Insert'][] = []
-    createdQuestions.forEach((question, qIndex) => {
-      // Chỉ tạo answers cho multiple_choice và true_false_multi
-      if (questions[qIndex].answers && questions[qIndex].answers.length > 0) {
-        questions[qIndex].answers.forEach((answer, aIndex) => {
-          answersData.push({
+      if (q.answers && q.answers.length > 0) {
+        for (let aIndex = 0; aIndex < q.answers.length; aIndex++) {
+          const ans = q.answers[aIndex]
+          await addDoc(collection(db, 'answers'), {
             question_id: question.id,
-            content: answer.content,
-            is_correct: answer.is_correct,
+            content: ans.content,
+            is_correct: ans.is_correct,
             order_index: aIndex + 1,
-          })
-        })
+            created_at: now,
+          } as Database['public']['Tables']['answers']['Insert'])
+        }
       }
-    })
+    }
 
-    const { error: answersError } = await supabase
-      .from('answers')
-      .insert(answersData)
+    await updateDoc(doc(db, 'exams', examId), {
+      total_questions: created.length,
+      updated_at: now,
+    } as any)
 
-    if (answersError) throw answersError
-
-    // Cập nhật total_questions
-    await supabase
-      .from('exams')
-      .update({ total_questions: createdQuestions.length })
-      .eq('id', examId)
-
-    return createdQuestions
+    return created
   },
 
   async updateQuestion(
     id: string,
     question: Database['public']['Tables']['questions']['Update']
   ) {
-    const { data, error } = await supabase
-      .from('questions')
-      .update(question)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as Question
+    const qRef = doc(db, 'questions', id)
+    await updateDoc(qRef, question as any)
+    const snap = await getDoc(qRef)
+    return normalizeId<Question>(snap.id, snap.data())
   },
 
   async deleteQuestion(id: string) {
-    const { error } = await supabase
-      .from('questions')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
+    await deleteDoc(doc(db, 'questions', id))
   },
 
   // Answers
   async createAnswer(answer: Database['public']['Tables']['answers']['Insert']) {
-    const { data, error } = await supabase
-      .from('answers')
-      .insert(answer)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as Answer
+    const now = new Date().toISOString()
+    const ref = await addDoc(collection(db, 'answers'), {
+      ...answer,
+      created_at: now,
+    })
+    const snap = await getDoc(ref)
+    return normalizeId<Answer>(snap.id, snap.data())
   },
 
   async updateAnswer(
     id: string,
     answer: Database['public']['Tables']['answers']['Update']
   ) {
-    const { data, error } = await supabase
-      .from('answers')
-      .update(answer)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data as Answer
+    const aRef = doc(db, 'answers', id)
+    await updateDoc(aRef, answer as any)
+    const snap = await getDoc(aRef)
+    return normalizeId<Answer>(snap.id, snap.data())
   },
 
   async deleteAnswer(id: string) {
-    const { error } = await supabase
-      .from('answers')
-      .delete()
-      .eq('id', id)
-
-    if (error) throw error
+    await deleteDoc(doc(db, 'answers', id))
   },
 
   // Exam Assignments
   async assignExamToStudents(examId: string, studentIds: string[], classId?: string | null) {
-    const assignments = studentIds.map(studentId => ({
-      exam_id: examId,
-      student_id: studentId,
-      class_id: classId || null,
-    }))
-
-    const { data, error } = await supabase
-      .from('exam_assignments')
-      .insert(assignments)
-      .select()
-
-    if (error) throw error
-    return data
+    const now = new Date().toISOString()
+    const created: any[] = []
+    for (const studentId of studentIds) {
+      const ref = await addDoc(collection(db, 'exam_assignments'), {
+        exam_id: examId,
+        student_id: studentId,
+        class_id: classId || null,
+        assigned_at: now,
+      })
+      const snap = await getDoc(ref)
+      created.push(normalizeId<any>(snap.id, snap.data()))
+    }
+    return created
   },
 
   // Giao bài cho lớp (tự động giao cho tất cả học sinh trong lớp)
   async assignExamToClass(examId: string, classId: string, startTime: string, endTime: string) {
-    // Cập nhật exam status và thời gian (nếu chưa có start_time/end_time trong exam)
-    const { data: examData } = await supabase
-      .from('exams')
-      .select('status, start_time, end_time')
-      .eq('id', examId)
-      .single()
+    const examRef = doc(db, 'exams', examId)
+    const examSnap = await getDoc(examRef)
+    if (!examSnap.exists()) throw new Error('Exam not found')
 
+    const examData = examSnap.data() as any
     const updateData: any = {}
-    if (examData && examData.status === 'draft') {
-      updateData.status = 'published'
-    }
-    
-    // Nếu exam chưa có start_time/end_time, set vào exam (fallback cho trường hợp cột assignment chưa tồn tại)
+    if (examData && examData.status === 'draft') updateData.status = 'published'
     if (!examData?.start_time || !examData?.end_time) {
       updateData.start_time = startTime
       updateData.end_time = endTime
     }
-
     if (Object.keys(updateData).length > 0) {
-      const { error: updateError } = await supabase
-        .from('exams')
-        .update(updateData)
-        .eq('id', examId)
-
-      if (updateError) throw updateError
+      await updateDoc(examRef, updateData)
     }
 
-    // Lấy tất cả học sinh trong lớp
-    const { data: classStudents, error: studentsError } = await supabase
-      .from('class_students')
-      .select('student_id')
-      .eq('class_id', classId)
-
-    if (studentsError) throw studentsError
-
+    const classStudentsSnap = await getDocs(
+      query(collection(db, 'class_students'), where('class_id', '==', classId))
+    )
+    const classStudents = classStudentsSnap.docs.map((d) => d.data() as any)
     if (!classStudents || classStudents.length === 0) {
       throw new Error('Lớp học không có học sinh nào')
     }
 
     const studentIds = classStudents.map((cs) => cs.student_id)
 
-    // Xóa assignments cũ cho class này (nếu có) để tránh duplicate
-    await supabase
-      .from('exam_assignments')
-      .delete()
-      .eq('exam_id', examId)
-      .eq('class_id', classId)
+    const existingAssignmentsSnap = await getDocs(
+      query(
+        collection(db, 'exam_assignments'),
+        where('exam_id', '==', examId),
+        where('class_id', '==', classId)
+      )
+    )
+    for (const docSnap of existingAssignmentsSnap.docs) {
+      await deleteDoc(docSnap.ref)
+    }
 
-    // Giao bài cho tất cả học sinh trong lớp với start_time và end_time riêng (nếu cột tồn tại)
-    const assignments: any[] = studentIds.map(studentId => ({
-      exam_id: examId,
-      student_id: studentId,
-      class_id: classId,
-    }))
-    
-    // Thêm start_time và end_time nếu cột tồn tại
-    try {
-      assignments.forEach((a: any) => {
-        a.start_time = startTime
-        a.end_time = endTime
+    const now = new Date().toISOString()
+    const assignments: any[] = []
+    for (const studentId of studentIds) {
+      const ref = await addDoc(collection(db, 'exam_assignments'), {
+        exam_id: examId,
+        student_id: studentId,
+        class_id: classId,
+        start_time: startTime,
+        end_time: endTime,
+        assigned_at: now,
       })
-    } catch (e) {
-      // Cột chưa tồn tại, bỏ qua
+      const snap = await getDoc(ref)
+      assignments.push(normalizeId<any>(snap.id, snap.data()))
     }
 
-    const { data, error } = await supabase
-      .from('exam_assignments')
-      .insert(assignments)
-      .select()
-
-    if (error) {
-      // Nếu lỗi do cột start_time/end_time chưa tồn tại, thử insert lại không có các cột đó
-      if (error.message?.includes('start_time') || error.message?.includes('end_time') || error.message?.includes('column')) {
-        const assignmentsWithoutTimes = studentIds.map(studentId => ({
-          exam_id: examId,
-          student_id: studentId,
-          class_id: classId,
-        }))
-        
-        const { data: data2, error: error2 } = await supabase
-          .from('exam_assignments')
-          .insert(assignmentsWithoutTimes)
-          .select()
-        
-        if (error2) throw error2
-        return data2
-      }
-      throw error
-    }
-    return data
+    return assignments
   },
 
-  // Tự động nộp bài khi hết giờ
+  // Tự động nộp bài khi hết giờ (bản đơn giản trên Firestore)
   async autoSubmitExpiredAttempts() {
     const now = new Date()
     const nowISO = now.toISOString()
-    
-    // Tìm các attempt đang in_progress
-    const { data: expiredAttempts, error } = await supabase
-      .from('exam_attempts')
-      .select(`
-        id,
-        exam_id,
-        student_id,
-        started_at,
-        exam:exams!exam_attempts_exam_id_fkey(
-          id,
-          duration_minutes,
-          end_time
-        )
-      `)
-      .eq('status', 'in_progress')
 
-    if (error) throw error
-    if (!expiredAttempts || expiredAttempts.length === 0) return []
+    const attemptsSnap = await getDocs(
+      query(collection(db, 'exam_attempts'), where('status', '==', 'in_progress'))
+    )
+    if (attemptsSnap.empty) return []
 
-    // Lấy assignment để kiểm tra end_time từ assignment
-    const studentIds = [...new Set(expiredAttempts.map((a: any) => a.student_id))]
-    const examIds = [...new Set(expiredAttempts.map((a: any) => a.exam_id))]
-
-    // Lấy assignments với start_time và end_time (nếu cột tồn tại)
-    let assignmentsMap: Record<string, any> = {}
-    try {
-      const { data: assignments } = await supabase
-        .from('exam_assignments')
-        .select('exam_id, student_id, start_time, end_time')
-        .in('exam_id', examIds)
-        .in('student_id', studentIds)
-
-      assignments?.forEach((a: any) => {
-        const key = `${a.exam_id}_${a.student_id}`
-        if (!assignmentsMap[key] || (a.end_time && new Date(a.end_time) > new Date(assignmentsMap[key]?.end_time || 0))) {
-          assignmentsMap[key] = a
-        }
+    const expiredIds: string[] = []
+    for (const docSnap of attemptsSnap.docs) {
+      const attempt = normalizeId<ExamAttempt>(docSnap.id, docSnap.data())
+      const examSnap = await getDocs(
+        query(collection(db, 'exams'), where('id', '==', attempt.exam_id))
+      )
+      let exam: any = null
+      examSnap.forEach((e) => {
+        exam = normalizeId<Exam>(e.id, e.data())
       })
-    } catch (e: any) {
-      if (e.message?.includes('start_time') || e.message?.includes('end_time')) {
-        // Ignore - columns may not exist yet
-      } else {
-        throw e
-      }
-    }
+      if (!exam) continue
 
-    const expired = expiredAttempts.filter((attempt: any) => {
-      const exam = attempt.exam
-      if (!exam) return false
-      
-      // Kiểm tra end_time từ assignment (ưu tiên)
-      const assignmentKey = `${attempt.exam_id}_${attempt.student_id}`
-      const assignment = assignmentsMap[assignmentKey]
-      if (assignment?.end_time && new Date(assignment.end_time) < now) {
-        return true
-      }
-      
-      // Kiểm tra nếu exam đã hết thời gian (fallback)
+      let isExpired = false
       if (exam.end_time && new Date(exam.end_time) < now) {
-        return true
-      }
-      
-      // Kiểm tra nếu đã hết thời gian làm bài (started_at + duration_minutes)
-      if (attempt.started_at && exam.duration_minutes) {
+        isExpired = true
+      } else if (attempt.started_at && exam.duration_minutes) {
         const startTime = new Date(attempt.started_at)
         const endTime = new Date(startTime.getTime() + exam.duration_minutes * 60 * 1000)
-        return endTime < now
+        if (endTime < now) isExpired = true
       }
-      
-      return false
-    })
 
-    // Tự động nộp bài cho các attempt hết giờ
-    const results = []
-    for (const attempt of expired) {
+      if (!isExpired) continue
+
       try {
-        // Tính thời gian đã làm
         const startedAt = new Date(attempt.started_at)
         const nowDate = new Date()
         const timeSpent = Math.floor((nowDate.getTime() - startedAt.getTime()) / 1000)
 
-        // Cập nhật attempt
-        await supabase
-          .from('exam_attempts')
-          .update({
-            status: 'timeout',
-            submitted_at: nowISO,
-            time_spent_seconds: timeSpent,
-          })
-          .eq('id', attempt.id)
+        await updateDoc(doc(db, 'exam_attempts', attempt.id), {
+          status: 'timeout',
+          submitted_at: nowISO,
+          time_spent_seconds: timeSpent,
+        } as any)
 
-        // Tính điểm và cập nhật
         await this.submitExam(attempt.id, timeSpent, [])
-
-        results.push(attempt.id)
-      } catch (err) {
-        // Ignore errors
+        expiredIds.push(attempt.id)
+      } catch {
+        // ignore per-attempt errors
       }
     }
 
-    return results
+    return expiredIds
   },
 
   async getAssignedExams(studentId?: string, useCache = true) {
-    const { data: { user } } = await supabase.auth.getUser()
-    const currentStudentId = studentId || user?.id
-
-    if (!currentStudentId) {
-      return []
-    }
+    const user = auth.currentUser
+    const currentStudentId = studentId || user?.uid
+    if (!currentStudentId) return []
 
     if (useCache) {
       const cached = cache.get<any[]>(CACHE_KEYS.assignedExams(currentStudentId))
-      if (cached) {
-        return cached
-      }
+      if (cached) return cached
     }
 
-    const { data: assignments, error } = await supabase
-      .from('exam_assignments')
-      .select('id, exam_id, student_id, assigned_at')
-      .eq('student_id', currentStudentId)
-      .order('assigned_at', { ascending: false })
-      .limit(20)
+    const assignmentsSnap = await getDocs(
+      query(
+        collection(db, 'exam_assignments'),
+        where('student_id', '==', currentStudentId),
+        orderBy('assigned_at', 'desc'),
+        limit(20)
+      )
+    )
+    if (assignmentsSnap.empty) return []
 
-    if (error) {
-      throw error
-    }
-    if (!assignments || assignments.length === 0) {
-      return []
-    }
+    const assignments = assignmentsSnap.docs.map((d) =>
+      normalizeId<any>(d.id, d.data())
+    )
 
-    // Lấy exam_ids và query exams với thông tin tối thiểu
-    const examIds = [...new Set(assignments.map((a: any) => a.exam_id).filter(Boolean))]
+    const examIds = [...new Set(assignments.map((a) => a.exam_id).filter(Boolean))]
     if (examIds.length === 0) return []
 
-    // Chỉ lấy những field cần thiết
-    const { data: exams, error: examsError } = await supabase
-      .from('exams')
-      .select('id, title, description, subject_id, teacher_id, duration_minutes, total_questions, status, passing_score')
-      .in('id', examIds)
+    const examsSnap = await getDocs(
+      query(collection(db, 'exams'), where('id', 'in', examIds))
+    )
+    const exams: any[] = []
+    examsSnap.forEach((e) => exams.push(normalizeId<Exam>(e.id, e.data())))
+    if (exams.length === 0) return []
 
-    if (examsError) throw examsError
-    if (!exams || exams.length === 0) return []
+    const subjectIds = [...new Set(exams.map((e) => e.subject_id).filter(Boolean))]
+    const teacherIds = [...new Set(exams.map((e) => e.teacher_id).filter(Boolean))]
 
-    // Lấy subject_ids và teacher_ids (chỉ lấy name)
-    const subjectIds = [...new Set(exams.map((e: any) => e.subject_id).filter(Boolean))]
-    const teacherIds = [...new Set(exams.map((e: any) => e.teacher_id).filter(Boolean))]
+    const subjectsMap: Record<string, any> = {}
+    const teachersMap: Record<string, any> = {}
 
-    let subjectsMap: Record<string, any> = {}
-    let teachersMap: Record<string, any> = {}
-
-    // Query song song
     const promises: Promise<void>[] = []
 
     if (subjectIds.length > 0) {
       promises.push(
         (async () => {
-          const { data } = await supabase
-            .from('subjects')
-            .select('id, name')
-            .in('id', subjectIds)
-          if (data) {
-            data.forEach((s: any) => {
-              subjectsMap[s.id] = s
-            })
-          }
+          const snap = await getDocs(
+            query(collection(db, 'subjects'), where('id', 'in', subjectIds))
+          )
+          snap.forEach((s) => {
+            const data = normalizeId<Database['public']['Tables']['subjects']['Row']>(
+              s.id,
+              s.data()
+            )
+            subjectsMap[data.id] = data
+          })
         })()
       )
     }
@@ -598,66 +484,53 @@ export const examApi = {
     if (teacherIds.length > 0) {
       promises.push(
         (async () => {
-          const { data } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .in('id', teacherIds)
-          if (data) {
-            data.forEach((t: any) => {
-              teachersMap[t.id] = t
-            })
-          }
+          const snap = await getDocs(
+            query(collection(db, 'profiles'), where('id', 'in', teacherIds))
+          )
+          snap.forEach((t) => {
+            const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(
+              t.id,
+              t.data()
+            )
+            teachersMap[data.id] = data
+          })
         })()
       )
     }
 
-    // Đợi tất cả queries hoàn thành
     if (promises.length > 0) {
       await Promise.allSettled(promises)
     }
 
-    // Thử lấy start_time và end_time từ assignments nếu cột tồn tại
-    const assignmentIds = assignments.map((a: any) => a.id)
-    let timesMap: Record<string, { start_time?: string; end_time?: string }> = {}
-    
+    const timesMap: Record<string, { start_time?: string; end_time?: string }> = {}
+    const assignmentIds = assignments.map((a) => a.id)
     if (assignmentIds.length > 0) {
-      try {
-        const { data: assignmentsWithTimes } = await supabase
-          .from('exam_assignments')
-          .select('id, start_time, end_time')
-          .in('id', assignmentIds)
-        
-        if (assignmentsWithTimes) {
-          assignmentsWithTimes.forEach((a: any) => {
-            timesMap[a.id] = { start_time: a.start_time, end_time: a.end_time }
-          })
-        }
-      } catch (e: any) {
-        // Cột chưa tồn tại, bỏ qua và dùng thời gian từ exam
-        if (e.message?.includes('start_time') || e.message?.includes('end_time') || e.message?.includes('column')) {
-          // Ignore - columns may not exist yet
-        }
-      }
+      const timesSnap = await getDocs(
+        query(collection(db, 'exam_assignments'), where('id', 'in', assignmentIds))
+      )
+      timesSnap.forEach((a) => {
+        const data = a.data() as any
+        timesMap[a.id] = { start_time: data.start_time, end_time: data.end_time }
+      })
     }
 
-    // Combine data - sử dụng start_time và end_time từ assignment nếu có
-    const result = assignments.map((assignment: any) => {
-      const exam = exams.find((e: any) => e.id === assignment.exam_id)
+    const result = assignments.map((assignment) => {
+      const exam = exams.find((e) => e.id === assignment.exam_id)
       const times = timesMap[assignment.id] || {}
       return {
         ...assignment,
-        exam: exam ? {
-          ...exam,
-          // Sử dụng start_time và end_time từ assignment nếu có, nếu không thì dùng từ exam
-          start_time: times.start_time || (exam as any).start_time || null,
-          end_time: times.end_time || (exam as any).end_time || null,
-          subject: exam.subject_id ? subjectsMap[exam.subject_id] || null : null,
-          teacher: exam.teacher_id ? teachersMap[exam.teacher_id] || null : null,
-        } : null,
+        exam: exam
+          ? {
+              ...exam,
+              start_time: times.start_time || (exam as any).start_time || null,
+              end_time: times.end_time || (exam as any).end_time || null,
+              subject: exam.subject_id ? subjectsMap[exam.subject_id] || null : null,
+              teacher: exam.teacher_id ? teachersMap[exam.teacher_id] || null : null,
+            }
+          : null,
       }
     })
 
-    // Cache kết quả (30 giây)
     if (useCache) {
       cache.set(CACHE_KEYS.assignedExams(currentStudentId), result, 30000)
     }
@@ -667,36 +540,57 @@ export const examApi = {
 
   // Exam Attempts
   async startAttempt(examId: string) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = auth.currentUser
     if (!user) throw new Error('Not authenticated')
 
-    const { data, error } = await supabase
-      .from('exam_attempts')
-      .insert({
-        exam_id: examId,
-        student_id: user.id,
-        status: 'in_progress',
-      })
-      .select()
-      .single()
+    const now = new Date().toISOString()
+    const ref = await addDoc(collection(db, 'exam_attempts'), {
+      exam_id: examId,
+      student_id: user.uid,
+      status: 'in_progress',
+      started_at: now,
+      created_at: now,
+    } as Database['public']['Tables']['exam_attempts']['Insert'])
 
-    if (error) throw error
-    return data as ExamAttempt
+    const snap = await getDoc(ref)
+    return normalizeId<ExamAttempt>(snap.id, snap.data())
   },
 
   async getAttempt(attemptId: string) {
-    const { data, error } = await supabase
-      .from('exam_attempts')
-      .select(`
-        *,
-        exam:exams(*),
-        student:profiles(*)
-      `)
-      .eq('id', attemptId)
-      .single()
+    const attemptRef = doc(db, 'exam_attempts', attemptId)
+    const snap = await getDoc(attemptRef)
+    if (!snap.exists()) throw new Error('Attempt not found')
+    const attempt = normalizeId<ExamAttempt>(snap.id, snap.data())
 
-    if (error) throw error
-    return data as ExamAttemptWithDetails
+    let exam: any = null
+    if (attempt.exam_id) {
+      const examSnap = await getDocs(
+        query(collection(db, 'exams'), where('id', '==', attempt.exam_id))
+      )
+      examSnap.forEach((e) => {
+        exam = normalizeId<Exam>(e.id, e.data())
+      })
+    }
+
+    let student: any = null
+    if (attempt.student_id) {
+      const studentSnap = await getDocs(
+        query(collection(db, 'profiles'), where('id', '==', attempt.student_id))
+      )
+      studentSnap.forEach((s) => {
+        student = normalizeId<Database['public']['Tables']['profiles']['Row']>(
+          s.id,
+          s.data()
+        )
+      })
+    }
+
+    return {
+      ...attempt,
+      exam,
+      student,
+      responses_count: 0,
+    } as ExamAttemptWithDetails
   },
 
   async submitResponse(
@@ -705,129 +599,132 @@ export const examApi = {
     answerId: string | null,
     textAnswer?: string
   ) {
-    // Lấy thông tin question và exam để tính điểm
-    const { data: question } = await supabase
-      .from('questions')
-      .select('question_type, points, correct_answer, exam_id')
-      .eq('id', questionId)
-      .single()
-
+    const questionSnap = await getDocs(
+      query(collection(db, 'questions'), where('id', '==', questionId))
+    )
+    let question: any = null
+    questionSnap.forEach((q) => {
+      question = normalizeId<Question>(q.id, q.data())
+    })
     if (!question) throw new Error('Question not found')
 
-    // Lấy thông tin exam để biết điểm cho từng phần
-    const { data: exam } = await supabase
-      .from('exams')
-      .select('total_score, multiple_choice_score, true_false_multi_score, short_answer_score')
-      .eq('id', question.exam_id)
-      .single()
+    const examSnap = await getDocs(
+      query(collection(db, 'exams'), where('id', '==', question.exam_id))
+    )
+    let exam: any = null
+    examSnap.forEach((e) => {
+      exam = normalizeId<Exam>(e.id, e.data())
+    })
 
-    // Đếm số câu hỏi trong mỗi phần
-    const { data: allQuestions } = await supabase
-      .from('questions')
-      .select('question_type')
-      .eq('exam_id', question.exam_id)
+    const allQuestionsSnap = await getDocs(
+      query(collection(db, 'questions'), where('exam_id', '==', question.exam_id))
+    )
+    const allQuestions: any[] = []
+    allQuestionsSnap.forEach((q) => allQuestions.push(q.data()))
 
-    const multipleChoiceCount = allQuestions?.filter(q => q.question_type === 'multiple_choice').length || 0
-    const trueFalseMultiCount = allQuestions?.filter(q => q.question_type === 'true_false_multi').length || 0
-    const shortAnswerCount = allQuestions?.filter(q => q.question_type === 'short_answer').length || 0
+    const multipleChoiceCount =
+      allQuestions.filter((q) => q.question_type === 'multiple_choice').length || 0
+    const trueFalseMultiCount =
+      allQuestions.filter((q) => q.question_type === 'true_false_multi').length || 0
+    const shortAnswerCount =
+      allQuestions.filter((q) => q.question_type === 'short_answer').length || 0
 
-    // Tính điểm cho mỗi câu hỏi dựa trên phần của nó
     let pointsPerQuestion = 0
     if (question.question_type === 'multiple_choice') {
-      pointsPerQuestion = multipleChoiceCount > 0 
-        ? (exam?.multiple_choice_score || 0) / multipleChoiceCount 
-        : 0
+      pointsPerQuestion =
+        multipleChoiceCount > 0
+          ? (exam?.multiple_choice_score || 0) / multipleChoiceCount
+          : 0
     } else if (question.question_type === 'true_false_multi') {
-      pointsPerQuestion = trueFalseMultiCount > 0 
-        ? (exam?.true_false_multi_score || 0) / trueFalseMultiCount 
-        : 0
+      pointsPerQuestion =
+        trueFalseMultiCount > 0
+          ? (exam?.true_false_multi_score || 0) / trueFalseMultiCount
+          : 0
     } else if (question.question_type === 'short_answer') {
-      pointsPerQuestion = shortAnswerCount > 0 
-        ? (exam?.short_answer_score || 0) / shortAnswerCount 
-        : 0
+      pointsPerQuestion =
+        shortAnswerCount > 0
+          ? (exam?.short_answer_score || 0) / shortAnswerCount
+          : 0
     }
 
     let isCorrect = false
     let pointsEarned = 0
 
-    // Xử lý theo loại câu hỏi
     if (question.question_type === 'short_answer' && textAnswer !== undefined) {
-      // So sánh đáp án số
-      const correctAnswer = question.correct_answer?.trim() || ''
+      const correctAnswer = (question.correct_answer || '').trim()
       const studentAnswer = textAnswer.trim()
       isCorrect = correctAnswer === studentAnswer
       pointsEarned = isCorrect ? pointsPerQuestion : 0
     } else if (question.question_type === 'true_false_multi' && answerId && textAnswer !== undefined) {
-      // True/False Multi: So sánh text_answer với is_correct của answer
-      const { data: answer } = await supabase
-        .from('answers')
-        .select('is_correct')
-        .eq('id', answerId)
-        .single()
-
+      const ansSnap = await getDocs(
+        query(collection(db, 'answers'), where('id', '==', answerId))
+      )
+      let answer: any = null
+      ansSnap.forEach((a) => {
+        answer = normalizeId<Answer>(a.id, a.data())
+      })
       if (answer) {
-        // textAnswer là "true" hoặc "false" (string)
-        // answer.is_correct là boolean
         const studentChoice = textAnswer === 'true'
         const correctAnswer = answer.is_correct === true
         isCorrect = studentChoice === correctAnswer
-        // Tính điểm: chia đều điểm của phần true_false_multi cho số lượng answers trong câu hỏi
-        const { data: questionAnswers } = await supabase
-          .from('answers')
-          .select('id')
-          .eq('question_id', questionId)
-        const answersCount = questionAnswers?.length || 1
+
+        const qAnsSnap = await getDocs(
+          query(collection(db, 'answers'), where('question_id', '==', questionId))
+        )
+        const answersCount = qAnsSnap.size || 1
         pointsEarned = isCorrect ? pointsPerQuestion / answersCount : 0
       }
     } else if (answerId) {
-      // Multiple choice
-      const { data: answer } = await supabase
-        .from('answers')
-        .select('is_correct')
-        .eq('id', answerId)
-        .single()
-
+      const ansSnap = await getDocs(
+        query(collection(db, 'answers'), where('id', '==', answerId))
+      )
+      let answer: any = null
+      ansSnap.forEach((a) => {
+        answer = normalizeId<Answer>(a.id, a.data())
+      })
       if (answer) {
-        isCorrect = answer.is_correct
+        isCorrect = !!answer.is_correct
         pointsEarned = isCorrect ? pointsPerQuestion : 0
       }
     }
 
-    // Kiểm tra xem đã có response chưa
-    // Với true_false_multi, mỗi answer có một response riêng, nên cần kiểm tra cả answer_id
+    // Check existing response
     let existing: any = null
     if (question.question_type === 'true_false_multi' && answerId) {
-      const { data } = await supabase
-      .from('exam_responses')
-      .select('id')
-      .eq('attempt_id', attemptId)
-      .eq('question_id', questionId)
-        .eq('answer_id', answerId)
-        .maybeSingle()
-      existing = data
+      const existingSnap = await getDocs(
+        query(
+          collection(db, 'exam_responses'),
+          where('attempt_id', '==', attemptId),
+          where('question_id', '==', questionId),
+          where('answer_id', '==', answerId)
+        )
+      )
+      if (!existingSnap.empty) {
+        const d = existingSnap.docs[0]
+        existing = normalizeId<ExamResponse>(d.id, d.data())
+      }
     } else {
-      const { data } = await supabase
-        .from('exam_responses')
-        .select('id')
-        .eq('attempt_id', attemptId)
-        .eq('question_id', questionId)
-        .maybeSingle()
-      existing = data
+      const existingSnap = await getDocs(
+        query(
+          collection(db, 'exam_responses'),
+          where('attempt_id', '==', attemptId),
+          where('question_id', '==', questionId)
+        )
+      )
+      if (!existingSnap.empty) {
+        const d = existingSnap.docs[0]
+        existing = normalizeId<ExamResponse>(d.id, d.data())
+      }
     }
 
-    // Đảm bảo user đã authenticated
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = auth.currentUser
     if (!user) throw new Error('Not authenticated')
 
-    // Kiểm tra attempt thuộc về user này và đang in_progress
-    const { data: attemptCheck } = await supabase
-      .from('exam_attempts')
-      .select('id, student_id, status')
-      .eq('id', attemptId)
-      .single()
+    const attemptSnap = await getDoc(doc(db, 'exam_attempts', attemptId))
+    if (!attemptSnap.exists()) throw new Error('Attempt not found')
+    const attemptCheck = normalizeId<ExamAttempt>(attemptSnap.id, attemptSnap.data())
 
-    if (!attemptCheck) throw new Error('Attempt not found')
-    if (attemptCheck.student_id !== user.id) {
+    if (attemptCheck.student_id !== user.uid) {
       throw new Error('Unauthorized: This attempt does not belong to you')
     }
     if (attemptCheck.status !== 'in_progress') {
@@ -835,40 +732,28 @@ export const examApi = {
     }
 
     if (existing) {
-      const { data, error } = await supabase
-        .from('exam_responses')
-        .update({
-          answer_id: answerId,
-          text_answer: textAnswer || null,
-          is_correct: isCorrect,
-          points_earned: pointsEarned,
-        })
-        .eq('id', existing.id)
-        .select()
-        .single()
-
-      if (error) {
-        throw error
-      }
-      return data as ExamResponse
+      const respRef = doc(db, 'exam_responses', existing.id)
+      await updateDoc(respRef, {
+        answer_id: answerId,
+        text_answer: textAnswer || null,
+        is_correct: isCorrect,
+        points_earned: pointsEarned,
+        answered_at: new Date().toISOString(),
+      } as any)
+      const snap = await getDoc(respRef)
+      return normalizeId<ExamResponse>(snap.id, snap.data())
     } else {
-      const { data, error } = await supabase
-        .from('exam_responses')
-        .insert({
-          attempt_id: attemptId,
-          question_id: questionId,
-          answer_id: answerId,
-          text_answer: textAnswer || null,
-          is_correct: isCorrect,
-          points_earned: pointsEarned,
-        })
-        .select()
-        .single()
-
-      if (error) {
-        throw error
-      }
-      return data as ExamResponse
+      const ref = await addDoc(collection(db, 'exam_responses'), {
+        attempt_id: attemptId,
+        question_id: questionId,
+        answer_id: answerId,
+        text_answer: textAnswer || null,
+        is_correct: isCorrect,
+        points_earned: pointsEarned,
+        answered_at: new Date().toISOString(),
+      } as Database['public']['Tables']['exam_responses']['Insert'])
+      const snap = await getDoc(ref)
+      return normalizeId<ExamResponse>(snap.id, snap.data())
     }
   },
 
@@ -876,213 +761,161 @@ export const examApi = {
     attemptId: string,
     timeSpent: number,
     violations: any[],
-    forceStatus?: 'submitted' | 'violation' // Cho phép admin/teacher đình chỉ thi
+    forceStatus?: 'submitted' | 'violation'
   ) {
-    // Đảm bảo user đã authenticated
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = auth.currentUser
     if (!user) throw new Error('Not authenticated')
 
-    // Kiểm tra attempt
-    const { data: attemptCheck } = await supabase
-      .from('exam_attempts')
-      .select('id, student_id, status')
-      .eq('id', attemptId)
-      .single()
+    const attemptRef = doc(db, 'exam_attempts', attemptId)
+    const attemptSnap = await getDoc(attemptRef)
+    if (!attemptSnap.exists()) throw new Error('Attempt not found')
+    const attemptCheck = normalizeId<ExamAttempt>(attemptSnap.id, attemptSnap.data())
 
-    if (!attemptCheck) throw new Error('Attempt not found')
-    
-    // Kiểm tra quyền: student chỉ có thể submit attempt của mình
-    // Admin/teacher có thể submit bất kỳ attempt nào (để đình chỉ thi)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    
+    const profileSnap = await getDoc(doc(db, 'profiles', user.uid))
+    const profile = profileSnap.exists()
+      ? (normalizeId<Database['public']['Tables']['profiles']['Row']>(
+          profileSnap.id,
+          profileSnap.data()
+        ) as any)
+      : null
+
     const isAdminOrTeacher = profile?.role === 'admin' || profile?.role === 'teacher'
-    
-    if (!isAdminOrTeacher && attemptCheck.student_id !== user.id) {
+
+    if (!isAdminOrTeacher && attemptCheck.student_id !== user.uid) {
       throw new Error('Unauthorized: This attempt does not belong to you')
     }
-    
     if (!isAdminOrTeacher && attemptCheck.status !== 'in_progress') {
       throw new Error('Cannot modify responses: Exam has already been submitted')
     }
 
-    // Tính điểm
-    const { data: responses } = await supabase
-      .from('exam_responses')
-      .select('points_earned')
-      .eq('attempt_id', attemptId)
+    const responsesSnap = await getDocs(
+      query(collection(db, 'exam_responses'), where('attempt_id', '==', attemptId))
+    )
+    const responses: any[] = []
+    responsesSnap.forEach((r) => responses.push(r.data()))
+    const totalPoints =
+      responses.reduce(
+        (sum, r) => sum + (parseFloat(r.points_earned as any) || 0),
+        0
+      ) || 0
 
-    const totalPoints = responses?.reduce((sum, r) => sum + (parseFloat(r.points_earned) || 0), 0) || 0
+    const examSnap = await getDocs(
+      query(collection(db, 'exams'), where('id', '==', attemptCheck.exam_id))
+    )
+    let exam: any = null
+    examSnap.forEach((e) => {
+      exam = normalizeId<Exam>(e.id, e.data())
+    })
 
-    // Lấy thông tin exam để biết thang điểm
-    const { data: attempt } = await supabase
-      .from('exam_attempts')
-      .select('exam:exams(total_score, total_questions)')
-      .eq('id', attemptId)
-      .single()
-
-    const exam = (attempt?.exam as any)
-    const totalScore = exam?.total_score || 10 // Thang điểm tổng
+    const totalScore = exam?.total_score || 10
     const percentage = Math.round((totalPoints / totalScore) * 100)
 
-    // Xác định status
-    // Nếu forceStatus được truyền vào (từ admin/teacher), sử dụng nó
-    // Nếu không, tự động xác định dựa trên số lượng violations
     let status: 'submitted' | 'violation' = forceStatus || 'submitted'
     if (!forceStatus && violations.length > 5) {
       status = 'violation'
     }
 
-    // Update attempt
-    let updateQuery = supabase
-      .from('exam_attempts')
-      .update({
-        submitted_at: new Date().toISOString(),
-        time_spent_seconds: timeSpent,
-        score: totalPoints,
-        percentage,
-        status,
-        violations_count: violations.length,
-        violations_data: violations,
-      })
-      .eq('id', attemptId)
+    const updateData = {
+      submitted_at: new Date().toISOString(),
+      time_spent_seconds: timeSpent,
+      score: totalPoints,
+      percentage,
+      status,
+      violations_count: violations.length,
+      violations_data: violations,
+    }
 
-    // Nếu là admin/teacher, không cần check student_id và status
-    // Nếu là student, chỉ update attempt của chính mình và khi còn in_progress
     if (!isAdminOrTeacher) {
-      updateQuery = updateQuery
-        .eq('student_id', user.id)
-        .eq('status', 'in_progress')
-    }
-
-    const { data, error } = await updateQuery.select().single()
-
-    if (error) {
-      // Nếu lỗi vì status đã thay đổi, thử update không cần điều kiện status
-      if (error.message?.includes('row-level security') || error.message?.includes('status')) {
-        const { data: retryData, error: retryError } = await supabase
-          .from('exam_attempts')
-          .update({
-            submitted_at: new Date().toISOString(),
-            time_spent_seconds: timeSpent,
-            score: totalPoints,
-            percentage,
-            status,
-            violations_count: violations.length,
-            violations_data: violations,
-          })
-          .eq('id', attemptId)
-          .eq('student_id', user.id)
-      .select()
-      .single()
-
-        if (retryError) throw retryError
-        return retryData as ExamAttempt
+      if (attemptCheck.student_id !== user.uid || attemptCheck.status !== 'in_progress') {
+        throw new Error('Cannot modify responses: Exam has already been submitted')
       }
-      throw error
     }
-    return data as ExamAttempt
+
+    await updateDoc(attemptRef, updateData as any)
+    const updatedSnap = await getDoc(attemptRef)
+    return normalizeId<ExamAttempt>(updatedSnap.id, updatedSnap.data())
   },
 
   async getAttempts(examId?: string, useCache = true) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = auth.currentUser
     if (!user) return []
 
-    // Kiểm tra role của user
     let userRole: string | null = null
     if (examId) {
-      // Nếu có examId, kiểm tra role để quyết định có filter theo student_id không
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-      userRole = profile?.role || null
+      const profileSnap = await getDoc(doc(db, 'profiles', user.uid))
+      if (profileSnap.exists()) {
+        const profile = normalizeId<Database['public']['Tables']['profiles']['Row']>(
+          profileSnap.id,
+          profileSnap.data()
+        ) as any
+        userRole = profile.role || null
+      }
     }
 
-    // Kiểm tra cache trước (chỉ khi không filter theo examId và là student)
     if (useCache && !examId && userRole !== 'admin' && userRole !== 'teacher') {
-      const cached = cache.get<ExamAttemptWithDetails[]>(CACHE_KEYS.attempts(user.id))
+      const cached = cache.get<ExamAttemptWithDetails[]>(CACHE_KEYS.attempts(user.uid))
       if (cached) return cached
     }
 
-    let query = supabase
-      .from('exam_attempts')
-      .select('id, exam_id, student_id, status, score, percentage, time_spent_seconds, created_at, submitted_at, violations_count, violations_data')
-      .order('created_at', { ascending: false })
-
+    const constraints: any[] = [orderBy('created_at', 'desc')]
     if (examId && (userRole === 'admin' || userRole === 'teacher')) {
-      query = query.eq('exam_id', examId)
+      constraints.push(where('exam_id', '==', examId))
     } else {
-      query = query.eq('student_id', user.id)
-    if (examId) {
-      query = query.eq('exam_id', examId)
-      }
-      query = query.limit(50)
+      constraints.push(where('student_id', '==', user.uid))
+      if (examId) constraints.push(where('exam_id', '==', examId))
     }
 
-    const { data: attempts, error } = await query
-    
-    if (error) {
-      throw error
-    }
-    if (!attempts || attempts.length === 0) {
-      return []
-    }
+    const attemptsSnap = await getDocs(query(collection(db, 'exam_attempts'), ...constraints))
+    if (attemptsSnap.empty) return []
 
-    // Chỉ lấy exam_ids và query exams với thông tin tối thiểu
-    const examIds = [...new Set(attempts.map((a: any) => a.exam_id).filter(Boolean))]
-    let examsMap: Record<string, any> = {}
+    const attempts: any[] = []
+    attemptsSnap.forEach((a) =>
+      attempts.push(normalizeId<ExamAttempt>(a.id, a.data()))
+    )
 
+    const examIds = [...new Set(attempts.map((a) => a.exam_id).filter(Boolean))]
+    const examsMap: Record<string, any> = {}
     if (examIds.length > 0) {
-      const { data: exams } = await supabase
-        .from('exams')
-        .select('id, title, total_questions, passing_score, total_score')
-        .in('id', examIds)
-      if (exams) {
-        exams.forEach((e: any) => {
-          examsMap[e.id] = e
+      const examsSnap = await getDocs(
+        query(collection(db, 'exams'), where('id', 'in', examIds))
+      )
+      examsSnap.forEach((e) => {
+        const data = normalizeId<Exam>(e.id, e.data())
+        examsMap[data.id] = data
+      })
+    }
+
+    const studentsMap: Record<string, any> = {}
+    if (examId && (userRole === 'admin' || userRole === 'teacher')) {
+      const studentIds = [...new Set(attempts.map((a) => a.student_id).filter(Boolean))]
+      if (studentIds.length > 0) {
+        const studentsSnap = await getDocs(
+          query(collection(db, 'profiles'), where('id', 'in', studentIds))
+        )
+        studentsSnap.forEach((s) => {
+          const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(
+            s.id,
+            s.data()
+          )
+          studentsMap[data.id] = data
         })
       }
     }
 
-    // Lấy thông tin student nếu là admin/teacher xem kết quả bài thi
-    let studentsMap: Record<string, any> = {}
-    if (examId && (userRole === 'admin' || userRole === 'teacher')) {
-      const studentIds = [...new Set(attempts.map((a: any) => a.student_id).filter(Boolean))]
-      if (studentIds.length > 0) {
-        const { data: students } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', studentIds)
-        if (students) {
-          students.forEach((s: any) => {
-            studentsMap[s.id] = s
-          })
-        }
-      }
-    }
-
-    // Không query response counts để nhanh hơn - có thể tính sau nếu cần
-
-    const result = attempts.map((attempt: any) => ({
+    const result = attempts.map((attempt) => ({
       ...attempt,
       exam: attempt.exam_id ? examsMap[attempt.exam_id] || null : null,
-      student: attempt.student_id && (userRole === 'admin' || userRole === 'teacher') 
-        ? studentsMap[attempt.student_id] || null 
-        : null,
-      responses_count: 0, // Không query để nhanh hơn
+      student:
+        attempt.student_id && (userRole === 'admin' || userRole === 'teacher')
+          ? studentsMap[attempt.student_id] || null
+          : null,
+      responses_count: 0,
     })) as ExamAttemptWithDetails[]
 
-    // Cache kết quả (30 giây, chỉ khi không filter)
     if (useCache && !examId) {
-      cache.set(CACHE_KEYS.attempts(user.id), result, 30000)
+      cache.set(CACHE_KEYS.attempts(user.uid), result, 30000)
     }
 
     return result
   },
 }
-
