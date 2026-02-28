@@ -115,11 +115,10 @@ export default function TeacherClasses() {
                 <button
                   key={classItem.id}
                   onClick={() => setSelectedClass(classItem)}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                    selectedClass?.id === classItem.id
+                  className={`w-full text-left p-3 rounded-lg border transition-colors ${selectedClass?.id === classItem.id
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <div className="font-medium">{classItem.name}</div>
                   <div className="text-sm text-gray-500">
@@ -138,7 +137,7 @@ export default function TeacherClasses() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-lg font-semibold">{selectedClass.name}</h2>
-                  <p className="text-sm text-gray-500">Mã lớp: {selectedClass.code}</p>
+                  <p className="text-sm text-gray-500">{selectedClass.total_students} học sinh</p>
                 </div>
                 <button
                   onClick={() => {
@@ -157,7 +156,6 @@ export default function TeacherClasses() {
                     <tr className="border-b">
                       <th className="text-left p-3">Họ tên</th>
                       <th className="text-left p-3">Email</th>
-                      <th className="text-left p-3">Mã học sinh</th>
                       <th className="text-right p-3">Thao tác</th>
                     </tr>
                   </thead>
@@ -174,9 +172,6 @@ export default function TeacherClasses() {
                           <td className="p-3">{item.student?.full_name}</td>
                           <td className="p-3 text-sm text-gray-600">
                             {item.student?.email || '-'}
-                          </td>
-                          <td className="p-3 text-sm text-gray-600">
-                            {item.student?.student_code || '-'}
                           </td>
                           <td className="p-3">
                             <button

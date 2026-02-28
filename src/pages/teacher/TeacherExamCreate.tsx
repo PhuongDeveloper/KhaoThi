@@ -12,7 +12,7 @@ export default function TeacherExamCreate() {
   const navigate = useNavigate()
   const location = useLocation()
   const { profile } = useAuthStore()
-  
+
   // Detect context: admin or teacher
   const isAdmin = location.pathname.startsWith('/admin')
   const basePath = isAdmin ? '/admin' : '/teacher'
@@ -25,14 +25,14 @@ export default function TeacherExamCreate() {
   const [calculatingAnswers, setCalculatingAnswers] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
+    description: '' as string | null,
     subject_id: '',
     duration_minutes: 60,
-    total_score: 10, // Thang điểm tổng
-    multiple_choice_score: 0, // Điểm cho phần trắc nghiệm 4 phương án
-    true_false_multi_score: 0, // Điểm cho phần đúng/sai 4 ý
-    short_answer_score: 0, // Điểm cho phần trả lời ngắn
-    passing_score: 50, // Điểm đạt (%) - giữ lại để tương thích
+    total_score: 10,
+    multiple_choice_score: 0,
+    true_false_multi_score: 0,
+    short_answer_score: 0,
+    passing_score: 50,
     shuffle_questions: true,
     shuffle_answers: true,
     allow_review: false,
@@ -101,7 +101,7 @@ export default function TeacherExamCreate() {
       // Tự động merge vào manualQuestions
       setManualQuestions([...manualQuestions, ...questions])
       toast.success(`Đã phân tích và trích xuất ${questions.length} câu hỏi từ file`)
-      
+
       // Scroll đến phần câu hỏi
       setTimeout(() => {
         document.getElementById('questions-section')?.scrollIntoView({ behavior: 'smooth' })
@@ -166,7 +166,7 @@ export default function TeacherExamCreate() {
       // Tự động merge vào manualQuestions
       setManualQuestions([...manualQuestions, ...questions])
       toast.success(`Đã phân tích và trích xuất ${questions.length} câu hỏi`)
-      
+
       // Scroll đến phần câu hỏi
       setTimeout(() => {
         document.getElementById('questions-section')?.scrollIntoView({ behavior: 'smooth' })
@@ -228,7 +228,7 @@ export default function TeacherExamCreate() {
       // answer.index là index trong mảng questions gửi cho AI (theo từng loại)
       // Cần map lại với originalIdx trong manualQuestions
       const updatedQuestions = [...manualQuestions]
-      
+
       // Tạo map để theo dõi index theo từng loại câu hỏi (không sử dụng nhưng giữ lại để tương lai có thể cần)
       // const typeIndexMap: Record<string, number> = {
       //   multiple_choice: 0,
@@ -313,7 +313,7 @@ export default function TeacherExamCreate() {
         start_time: formData.start_time || null,
         end_time: formData.end_time || null,
       }
-      
+
       const exam = await examApi.createExam(examData)
 
       await examApi.createQuestionsWithAnswers(exam.id, allQuestions)
@@ -347,17 +347,7 @@ export default function TeacherExamCreate() {
                 required
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Mô tả
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="input"
-                rows={3}
-              />
-            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -413,7 +403,7 @@ export default function TeacherExamCreate() {
                   Tổng điểm của bài thi (ví dụ: 10 điểm)
                 </p>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -433,7 +423,7 @@ export default function TeacherExamCreate() {
                     Điểm cho phần trắc nghiệm 4 phương án
                   </p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Điểm phần đúng/sai 4 ý
@@ -452,7 +442,7 @@ export default function TeacherExamCreate() {
                     Điểm cho phần đúng/sai 4 ý
                   </p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Điểm phần trả lời ngắn
@@ -472,12 +462,11 @@ export default function TeacherExamCreate() {
                   </p>
                 </div>
               </div>
-              
-              <div className={`p-3 rounded-lg ${
-                (formData.multiple_choice_score + formData.true_false_multi_score + formData.short_answer_score) === formData.total_score
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
-              }`}>
+
+              <div className={`p-3 rounded-lg ${(formData.multiple_choice_score + formData.true_false_multi_score + formData.short_answer_score) === formData.total_score
+                ? 'bg-green-50 text-green-700'
+                : 'bg-red-50 text-red-700'
+                }`}>
                 <p className="text-sm font-medium">
                   Tổng điểm 3 phần: {formData.multiple_choice_score + formData.true_false_multi_score + formData.short_answer_score} / {formData.total_score}
                   {(formData.multiple_choice_score + formData.true_false_multi_score + formData.short_answer_score) !== formData.total_score && (
@@ -485,49 +474,44 @@ export default function TeacherExamCreate() {
                   )}
                 </p>
               </div>
-              
+            </div>
+            <div className="grid grid-cols-2 gap-4 pt-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Điểm đạt (%)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian bắt đầu</label>
                 <input
-                  type="number"
-                  value={formData.passing_score}
-                  onChange={(e) =>
-                    setFormData({ ...formData, passing_score: parseInt(e.target.value) })
-                  }
-                  className="input"
-                  min={0}
-                  max={100}
+                  type="datetime-local"
+                  value={formData.start_time}
+                  onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                  className="input text-sm"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Phần trăm điểm đạt để qua bài thi (ví dụ: 50%)
-                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian kết thúc</label>
+                <input
+                  type="datetime-local"
+                  value={formData.end_time}
+                  onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                  className="input text-sm"
+                />
               </div>
             </div>
-            <div className="flex space-x-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.shuffle_questions}
-                  onChange={(e) =>
-                    setFormData({ ...formData, shuffle_questions: e.target.checked })
-                  }
-                  className="mr-2"
-                />
-                Xáo trộn câu hỏi
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.shuffle_answers}
-                  onChange={(e) =>
-                    setFormData({ ...formData, shuffle_answers: e.target.checked })
-                  }
-                  className="mr-2"
-                />
-                Xáo trộn đáp án
-              </label>
+            <div className="grid grid-cols-3 gap-3 pt-2">
+              {[
+                { key: 'shuffle_questions' as const, label: 'Xáo trộn câu hỏi' },
+                { key: 'shuffle_answers' as const, label: 'Xáo trộn đáp án' },
+                { key: 'allow_review' as const, label: 'Cho xem lại đáp án' },
+              ].map(({ key, label }) => (
+                <label key={key} className={`flex items-center gap-2 p-3 rounded-xl border-2 cursor-pointer transition-all ${formData[key] ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}>
+                  <input type="checkbox" className="sr-only" checked={formData[key]}
+                    onChange={e => setFormData({ ...formData, [key]: e.target.checked })} />
+                  <div className={`w-4 h-4 rounded border-2 flex-shrink-0 flex items-center justify-center ${formData[key] ? 'bg-primary-600 border-primary-600' : 'border-gray-400'
+                    }`}>
+                    {formData[key] && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <span className="text-sm font-medium">{label}</span>
+                </label>
+              ))}
             </div>
           </div>
         </div>
@@ -590,7 +574,7 @@ export default function TeacherExamCreate() {
                 ✅ Hỗ trợ đọc trực tiếp: PDF, DOCX, Excel, TXT. Hoặc bạn có thể dán nội dung vào ô bên dưới
               </p>
             </div>
-            
+
             <div className="border-t pt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Hoặc dán nội dung từ file vào đây
@@ -1107,24 +1091,24 @@ export default function TeacherExamCreate() {
               <ChevronDown className="h-5 w-5" />
             )}
           </button>
-          
+
           {showManualQuestions && (
             <>
               <div className="flex gap-2 mb-4">
-                <button 
-                  onClick={() => handleAddManualQuestion('multiple_choice')} 
+                <button
+                  onClick={() => handleAddManualQuestion('multiple_choice')}
                   className="btn btn-secondary text-sm"
                 >
                   + Trắc nghiệm 4 phương án
                 </button>
-                <button 
-                  onClick={() => handleAddManualQuestion('true_false_multi')} 
+                <button
+                  onClick={() => handleAddManualQuestion('true_false_multi')}
                   className="btn btn-secondary text-sm"
                 >
                   + Đúng/Sai (4 ý)
                 </button>
-                <button 
-                  onClick={() => handleAddManualQuestion('short_answer')} 
+                <button
+                  onClick={() => handleAddManualQuestion('short_answer')}
                   className="btn btn-secondary text-sm"
                 >
                   + Trả lời ngắn
