@@ -59,29 +59,45 @@ export interface ExamAnalysis {
 const MAX_DAILY_API_CALLS = 100
 
 async function checkApiLimit(teacherId: string): Promise<boolean> {
+  // Nếu thiếu teacherId thì không áp giới hạn (tránh false positive)
+  if (!teacherId) return true
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
   const generationsCol = collection(db, 'ai_question_generations')
-  const q = query(
-    generationsCol,
-    where('teacher_id', '==', teacherId),
-    where('created_at', '>=', Timestamp.fromDate(today)),
-    where('created_at', '<', Timestamp.fromDate(tomorrow))
-  )
 
   try {
-    const snapshot = await getDocs(q)
+    // Tránh yêu cầu composite index: chỉ filter theo teacher_id, còn lại lọc ở client
+    const snapshot = await getDocs(
+      query(generationsCol, where('teacher_id', '==', teacherId))
+    )
+
     const totalCalls =
-      snapshot.docs.reduce((sum, doc) => {
-        const data = doc.data()
+      snapshot.docs.reduce((sum, docSnap) => {
+        const data = docSnap.data() as any
+
+        const createdAtRaw = data.created_at
+        const createdAt: Date | null =
+          createdAtRaw?.toDate?.() instanceof Date
+            ? createdAtRaw.toDate()
+            : createdAtRaw
+            ? new Date(createdAtRaw)
+            : null
+
+        if (!createdAt) return sum
+        if (createdAt < today || createdAt >= tomorrow) return sum
+
         return sum + (data.api_calls_count || 0)
       }, 0) || 0
+
     return totalCalls < MAX_DAILY_API_CALLS
   } catch (error) {
-    return false
+    // Nếu có lỗi (ví dụ thiếu index / lỗi quyền), log lại nhưng KHÔNG chặn người dùng
+    console.error('[Gemini] Lỗi khi kiểm tra giới hạn API:', error)
+    return true
   }
 }
 
