@@ -96,22 +96,31 @@ export default function ExamMonitoring() {
 
   const loadAttemptDetails = async (attemptId: string) => {
     try {
+      // Tránh yêu cầu composite index (where + orderBy):
+      // chỉ where, sau đó sort theo created_at ở client
       const responsesQuery = query(
         collection(db, 'exam_responses'),
-        where('attempt_id', '==', attemptId),
-        orderBy('created_at', 'asc')
+        where('attempt_id', '==', attemptId)
       )
       const responsesSnap = await getDocs(responsesQuery)
 
       const responsesMap: Record<string, any[]> = {}
       responsesSnap.forEach((docSnap) => {
         const r = { id: docSnap.id, ...docSnap.data() } as any
-        if (r.question_id && !responsesMap[r.question_id]) {
-          responsesMap[r.question_id] = []
-        }
         if (r.question_id) {
+          if (!responsesMap[r.question_id]) {
+            responsesMap[r.question_id] = []
+          }
           responsesMap[r.question_id].push(r)
         }
+      })
+
+      // Sort từng danh sách response theo created_at tăng dần
+      Object.keys(responsesMap).forEach((qid) => {
+        responsesMap[qid].sort(
+          (a, b) =>
+            new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+        )
       })
 
       setSelectedResponses(responsesMap)

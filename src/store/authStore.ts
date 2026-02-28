@@ -56,31 +56,38 @@ export const useAuthStore = create<AuthState>()(
       loading: false,
       initialized: false,
 
+      // Khởi tạo auth: lắng nghe onAuthStateChanged một lần để restore session sau khi reload
       initialize: async () => {
-        set({ loading: true })
-        try {
-          // Firebase giữ session trong client, chỉ cần đọc currentUser
-          const user = auth.currentUser
-          set({ user, session: null })
+        // Nếu đã init rồi thì không cần làm lại
+        if (get().initialized) return
 
-          if (user) {
+        set({ loading: true })
+
+        await new Promise<void>((resolve) => {
+          const unsubscribe = onAuthStateChanged(auth, async (user) => {
             try {
-              const profilePromise = get().fetchProfile()
-              const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
-              )
-              await Promise.race([profilePromise, timeoutPromise])
-            } catch {
-              // Ignore profile fetch errors during init
+              // Đồng bộ state với Firebase Auth
+              set({ user: user ?? null, session: null })
+
+              if (user) {
+                try {
+                  await get().fetchProfile()
+                } catch (error) {
+                  console.error(
+                    '[AuthStore] Lỗi khi fetch profile trong initialize:',
+                    error
+                  )
+                }
+              } else {
+                set({ profile: null })
+              }
+            } finally {
+              set({ loading: false, initialized: true })
+              unsubscribe()
+              resolve()
             }
-          } else {
-            set({ profile: null })
-          }
-        } catch {
-          // Ignore initialization errors
-        } finally {
-          set({ loading: false, initialized: true })
-        }
+          })
+        })
       },
 
       signIn: async (email: string, password: string) => {
@@ -276,22 +283,10 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage', // Tên key trong localStorage
       partialize: (state) => ({
-        // Chỉ lưu những thông tin cần thiết, không lưu loading và initialized
-        user: state.user,
-        session: state.session,
+        // Chỉ lưu profile, để Firebase tự quản lý session & user
         profile: state.profile,
       }),
     }
   )
 )
-
-// Lắng nghe thay đổi auth state từ Firebase
-onAuthStateChanged(auth, async (user) => {
-  useAuthStore.setState({ session: null, user: user ?? null })
-  if (user) {
-    await useAuthStore.getState().fetchProfile()
-  } else {
-    useAuthStore.setState({ profile: null })
-  }
-})
 

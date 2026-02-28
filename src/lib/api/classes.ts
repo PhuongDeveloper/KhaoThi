@@ -180,12 +180,8 @@ export async function deleteClass(id: string) {
 // Lấy học sinh trong lớp
 export async function getClassStudents(classId: string) {
   const classStudentsCol = collection(db, 'class_students')
-  const q = query(
-    classStudentsCol,
-    where('class_id', '==', classId),
-    orderBy('joined_at', 'asc')
-  )
-  const snapshot = await getDocs(q)
+  // Tránh yêu cầu index: lấy tất cả rồi filter & sort ở client
+  const snapshot = await getDocs(classStudentsCol)
 
   if (snapshot.empty) return []
 
@@ -194,13 +190,21 @@ export async function getClassStudents(classId: string) {
 
   snapshot.forEach((docSnap) => {
     const data = docSnap.data()
-    classStudents.push({
-      id: docSnap.id,
-      ...data,
-      joined_at: data.joined_at?.toDate?.()?.toISOString() || data.joined_at,
-    })
-    if (data.student_id) studentIds.add(data.student_id)
+    if (data.class_id === classId) {
+      classStudents.push({
+        id: docSnap.id,
+        ...data,
+        joined_at: data.joined_at?.toDate?.()?.toISOString() || data.joined_at,
+      })
+      if (data.student_id) studentIds.add(data.student_id)
+    }
   })
+
+  // Sắp xếp theo joined_at tăng dần ở client
+  classStudents.sort(
+    (a, b) =>
+      new Date(a.joined_at || 0).getTime() - new Date(b.joined_at || 0).getTime()
+  )
 
   // Lấy thông tin students
   const studentsMap: Record<string, any> = {}
@@ -457,12 +461,8 @@ export async function getMyHomeroomClasses() {
 
       try {
         const classesCol = collection(db, 'classes')
-        const q = query(
-          classesCol,
-          where('homeroom_teacher_id', '==', user.uid),
-          orderBy('name', 'asc')
-        )
-        const snapshot = await getDocs(q)
+        // Tránh yêu cầu index: lấy tất cả rồi filter & sort ở client
+        const snapshot = await getDocs(classesCol)
 
         if (snapshot.empty) {
           resolve([])
@@ -471,14 +471,19 @@ export async function getMyHomeroomClasses() {
 
         const classes: Class[] = []
         snapshot.forEach((docSnap) => {
-          const data = docSnap.data()
-          classes.push({
-            id: docSnap.id,
-            ...data,
-            created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
-            updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
-          } as Class)
+          const data = docSnap.data() as any
+          if (data.homeroom_teacher_id === user.uid) {
+            classes.push({
+              id: docSnap.id,
+              ...data,
+              created_at: data.created_at?.toDate?.()?.toISOString() || data.created_at,
+              updated_at: data.updated_at?.toDate?.()?.toISOString() || data.updated_at,
+            } as Class)
+          }
         })
+
+        // Sắp xếp theo tên lớp A-Z ở client
+        classes.sort((a, b) => a.name.localeCompare(b.name))
 
         resolve(classes)
       } catch (error) {
