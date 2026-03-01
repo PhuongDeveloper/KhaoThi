@@ -72,22 +72,22 @@ export const examApi = {
     const profilesMap: Record<string, any> = {}
 
     if (subjectIds.length > 0) {
-      const subjectsSnap = await getDocs(
-        query(collection(db, 'subjects'), where('id', 'in', subjectIds))
-      )
-      subjectsSnap.forEach((s) => {
-        const data = normalizeId<Database['public']['Tables']['subjects']['Row']>(s.id, s.data())
-        subjectsMap[data.id] = data
+      const subjectsSnaps = await Promise.all(subjectIds.map(id => getDoc(doc(db, 'subjects', id))))
+      subjectsSnaps.forEach((s) => {
+        if (s.exists()) {
+          const data = normalizeId<Database['public']['Tables']['subjects']['Row']>(s.id, s.data())
+          subjectsMap[data.id] = data
+        }
       })
     }
 
     if (teacherIds.length > 0) {
-      const profilesSnap = await getDocs(
-        query(collection(db, 'profiles'), where('id', 'in', teacherIds))
-      )
-      profilesSnap.forEach((p) => {
-        const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(p.id, p.data())
-        profilesMap[data.id] = data
+      const profilesSnaps = await Promise.all(teacherIds.map(id => getDoc(doc(db, 'profiles', id))))
+      profilesSnaps.forEach((p) => {
+        if (p.exists()) {
+          const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(p.id, p.data())
+          profilesMap[data.id] = data
+        }
       })
     }
 
@@ -109,21 +109,17 @@ export const examApi = {
     let teacher: any = null
 
     if (exam.subject_id) {
-      const subjectSnap = await getDocs(
-        query(collection(db, 'subjects'), where('id', '==', exam.subject_id))
-      )
-      subjectSnap.forEach((s) => {
-        subject = normalizeId<Database['public']['Tables']['subjects']['Row']>(s.id, s.data())
-      })
+      const subjectSnap = await getDoc(doc(db, 'subjects', exam.subject_id))
+      if (subjectSnap.exists()) {
+        subject = normalizeId<Database['public']['Tables']['subjects']['Row']>(subjectSnap.id, subjectSnap.data())
+      }
     }
 
     if (exam.teacher_id) {
-      const teacherSnap = await getDocs(
-        query(collection(db, 'profiles'), where('id', '==', exam.teacher_id))
-      )
-      teacherSnap.forEach((t) => {
-        teacher = normalizeId<Database['public']['Tables']['profiles']['Row']>(t.id, t.data())
-      })
+      const teacherSnap = await getDoc(doc(db, 'profiles', exam.teacher_id))
+      if (teacherSnap.exists()) {
+        teacher = normalizeId<Database['public']['Tables']['profiles']['Row']>(teacherSnap.id, teacherSnap.data())
+      }
     }
 
     return {
@@ -392,13 +388,11 @@ export const examApi = {
     const expiredIds: string[] = []
     for (const docSnap of attemptsSnap.docs) {
       const attempt = normalizeId<ExamAttempt>(docSnap.id, docSnap.data())
-      const examSnap = await getDocs(
-        query(collection(db, 'exams'), where('id', '==', attempt.exam_id))
-      )
+      const examSnap = await getDoc(doc(db, 'exams', attempt.exam_id))
       let exam: any = null
-      examSnap.forEach((e) => {
-        exam = normalizeId<Exam>(e.id, e.data())
-      })
+      if (examSnap.exists()) {
+        exam = normalizeId<Exam>(examSnap.id, examSnap.data())
+      }
       if (!exam) continue
 
       let isExpired = false
@@ -457,11 +451,11 @@ export const examApi = {
     const examIds = [...new Set(assignments.map((a) => a.exam_id).filter(Boolean))]
     if (examIds.length === 0) return []
 
-    const examsSnap = await getDocs(
-      query(collection(db, 'exams'), where('id', 'in', examIds))
-    )
+    const examPromiseSnaps = await Promise.all(examIds.map(id => getDoc(doc(db, 'exams', id))))
     const exams: any[] = []
-    examsSnap.forEach((e) => exams.push(normalizeId<Exam>(e.id, e.data())))
+    examPromiseSnaps.forEach((e) => {
+      if (e.exists()) exams.push(normalizeId<Exam>(e.id, e.data()))
+    })
     if (exams.length === 0) return []
 
     const subjectIds = [...new Set(exams.map((e) => e.subject_id).filter(Boolean))]
@@ -475,15 +469,12 @@ export const examApi = {
     if (subjectIds.length > 0) {
       promises.push(
         (async () => {
-          const snap = await getDocs(
-            query(collection(db, 'subjects'), where('id', 'in', subjectIds))
-          )
-          snap.forEach((s) => {
-            const data = normalizeId<Database['public']['Tables']['subjects']['Row']>(
-              s.id,
-              s.data()
-            )
-            subjectsMap[data.id] = data
+          const snaps = await Promise.all(subjectIds.map(id => getDoc(doc(db, 'subjects', id))))
+          snaps.forEach((s) => {
+            if (s.exists()) {
+              const data = normalizeId<Database['public']['Tables']['subjects']['Row']>(s.id, s.data())
+              subjectsMap[data.id] = data
+            }
           })
         })()
       )
@@ -492,15 +483,12 @@ export const examApi = {
     if (teacherIds.length > 0) {
       promises.push(
         (async () => {
-          const snap = await getDocs(
-            query(collection(db, 'profiles'), where('id', 'in', teacherIds))
-          )
-          snap.forEach((t) => {
-            const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(
-              t.id,
-              t.data()
-            )
-            teachersMap[data.id] = data
+          const snaps = await Promise.all(teacherIds.map(id => getDoc(doc(db, 'profiles', id))))
+          snaps.forEach((t) => {
+            if (t.exists()) {
+              const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(t.id, t.data())
+              teachersMap[data.id] = data
+            }
           })
         })()
       )
@@ -513,12 +501,12 @@ export const examApi = {
     const timesMap: Record<string, { start_time?: string; end_time?: string }> = {}
     const assignmentIds = assignments.map((a) => a.id)
     if (assignmentIds.length > 0) {
-      const timesSnap = await getDocs(
-        query(collection(db, 'exam_assignments'), where('id', 'in', assignmentIds))
-      )
-      timesSnap.forEach((a) => {
-        const data = a.data() as any
-        timesMap[a.id] = { start_time: data.start_time, end_time: data.end_time }
+      const timesSnaps = await Promise.all(assignmentIds.map(id => getDoc(doc(db, 'exam_assignments', id))))
+      timesSnaps.forEach((a) => {
+        if (a.exists()) {
+          const data = a.data() as any
+          timesMap[a.id] = { start_time: data.start_time, end_time: data.end_time }
+        }
       })
     }
 
@@ -529,12 +517,12 @@ export const examApi = {
         ...assignment,
         exam: exam
           ? {
-              ...exam,
-              start_time: times.start_time || (exam as any).start_time || null,
-              end_time: times.end_time || (exam as any).end_time || null,
-              subject: exam.subject_id ? subjectsMap[exam.subject_id] || null : null,
-              teacher: exam.teacher_id ? teachersMap[exam.teacher_id] || null : null,
-            }
+            ...exam,
+            start_time: times.start_time || (exam as any).start_time || null,
+            end_time: times.end_time || (exam as any).end_time || null,
+            subject: exam.subject_id ? subjectsMap[exam.subject_id] || null : null,
+            teacher: exam.teacher_id ? teachersMap[exam.teacher_id] || null : null,
+          }
           : null,
       }
     })
@@ -579,25 +567,18 @@ export const examApi = {
 
     let exam: any = null
     if (attempt.exam_id) {
-      const examSnap = await getDocs(
-        query(collection(db, 'exams'), where('id', '==', attempt.exam_id))
-      )
-      examSnap.forEach((e) => {
-        exam = normalizeId<Exam>(e.id, e.data())
-      })
+      const examSnap = await getDoc(doc(db, 'exams', attempt.exam_id))
+      if (examSnap.exists()) {
+        exam = normalizeId<Exam>(examSnap.id, examSnap.data())
+      }
     }
 
     let student: any = null
     if (attempt.student_id) {
-      const studentSnap = await getDocs(
-        query(collection(db, 'profiles'), where('id', '==', attempt.student_id))
-      )
-      studentSnap.forEach((s) => {
-        student = normalizeId<Database['public']['Tables']['profiles']['Row']>(
-          s.id,
-          s.data()
-        )
-      })
+      const studentSnap = await getDoc(doc(db, 'profiles', attempt.student_id))
+      if (studentSnap.exists()) {
+        student = normalizeId<Database['public']['Tables']['profiles']['Row']>(studentSnap.id, studentSnap.data())
+      }
     }
 
     return {
@@ -614,22 +595,18 @@ export const examApi = {
     answerId: string | null,
     textAnswer?: string
   ) {
-    const questionSnap = await getDocs(
-      query(collection(db, 'questions'), where('id', '==', questionId))
-    )
+    const questionSnap = await getDoc(doc(db, 'questions', questionId))
     let question: any = null
-    questionSnap.forEach((q) => {
-      question = normalizeId<Question>(q.id, q.data())
-    })
+    if (questionSnap.exists()) {
+      question = normalizeId<Question>(questionSnap.id, questionSnap.data())
+    }
     if (!question) throw new Error('Question not found')
 
-    const examSnap = await getDocs(
-      query(collection(db, 'exams'), where('id', '==', question.exam_id))
-    )
+    const examSnap = await getDoc(doc(db, 'exams', question.exam_id))
     let exam: any = null
-    examSnap.forEach((e) => {
-      exam = normalizeId<Exam>(e.id, e.data())
-    })
+    if (examSnap.exists()) {
+      exam = normalizeId<Exam>(examSnap.id, examSnap.data())
+    }
 
     const allQuestionsSnap = await getDocs(
       query(collection(db, 'questions'), where('exam_id', '==', question.exam_id))
@@ -671,13 +648,11 @@ export const examApi = {
       isCorrect = correctAnswer === studentAnswer
       pointsEarned = isCorrect ? pointsPerQuestion : 0
     } else if (question.question_type === 'true_false_multi' && answerId && textAnswer !== undefined) {
-      const ansSnap = await getDocs(
-        query(collection(db, 'answers'), where('id', '==', answerId))
-      )
+      const ansSnap = await getDoc(doc(db, 'answers', answerId))
       let answer: any = null
-      ansSnap.forEach((a) => {
-        answer = normalizeId<Answer>(a.id, a.data())
-      })
+      if (ansSnap.exists()) {
+        answer = normalizeId<Answer>(ansSnap.id, ansSnap.data())
+      }
       if (answer) {
         const studentChoice = textAnswer === 'true'
         const correctAnswer = answer.is_correct === true
@@ -690,13 +665,11 @@ export const examApi = {
         pointsEarned = isCorrect ? pointsPerQuestion / answersCount : 0
       }
     } else if (answerId) {
-      const ansSnap = await getDocs(
-        query(collection(db, 'answers'), where('id', '==', answerId))
-      )
+      const ansSnap = await getDoc(doc(db, 'answers', answerId))
       let answer: any = null
-      ansSnap.forEach((a) => {
-        answer = normalizeId<Answer>(a.id, a.data())
-      })
+      if (ansSnap.exists()) {
+        answer = normalizeId<Answer>(ansSnap.id, ansSnap.data())
+      }
       if (answer) {
         isCorrect = !!answer.is_correct
         pointsEarned = isCorrect ? pointsPerQuestion : 0
@@ -789,9 +762,9 @@ export const examApi = {
     const profileSnap = await getDoc(doc(db, 'profiles', user.uid))
     const profile = profileSnap.exists()
       ? (normalizeId<Database['public']['Tables']['profiles']['Row']>(
-          profileSnap.id,
-          profileSnap.data()
-        ) as any)
+        profileSnap.id,
+        profileSnap.data()
+      ) as any)
       : null
 
     const isAdminOrTeacher = profile?.role === 'admin' || profile?.role === 'teacher'
@@ -814,13 +787,11 @@ export const examApi = {
         0
       ) || 0
 
-    const examSnap = await getDocs(
-      query(collection(db, 'exams'), where('id', '==', attemptCheck.exam_id))
-    )
+    const examSnap = await getDoc(doc(db, 'exams', attemptCheck.exam_id))
     let exam: any = null
-    examSnap.forEach((e) => {
-      exam = normalizeId<Exam>(e.id, e.data())
-    })
+    if (examSnap.exists()) {
+      exam = normalizeId<Exam>(examSnap.id, examSnap.data())
+    }
 
     const totalScore = exam?.total_score || 10
     const percentage = Math.round((totalPoints / totalScore) * 100)
@@ -893,12 +864,12 @@ export const examApi = {
     const examIds = [...new Set(attempts.map((a) => a.exam_id).filter(Boolean))]
     const examsMap: Record<string, any> = {}
     if (examIds.length > 0) {
-      const examsSnap = await getDocs(
-        query(collection(db, 'exams'), where('id', 'in', examIds))
-      )
-      examsSnap.forEach((e) => {
-        const data = normalizeId<Exam>(e.id, e.data())
-        examsMap[data.id] = data
+      const examsSnaps = await Promise.all(examIds.map(id => getDoc(doc(db, 'exams', id))))
+      examsSnaps.forEach((e) => {
+        if (e.exists()) {
+          const data = normalizeId<Exam>(e.id, e.data())
+          examsMap[data.id] = data
+        }
       })
     }
 
@@ -906,15 +877,12 @@ export const examApi = {
     if (examId && (userRole === 'admin' || userRole === 'teacher')) {
       const studentIds = [...new Set(attempts.map((a) => a.student_id).filter(Boolean))]
       if (studentIds.length > 0) {
-        const studentsSnap = await getDocs(
-          query(collection(db, 'profiles'), where('id', 'in', studentIds))
-        )
-        studentsSnap.forEach((s) => {
-          const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(
-            s.id,
-            s.data()
-          )
-          studentsMap[data.id] = data
+        const studentsSnaps = await Promise.all(studentIds.map(id => getDoc(doc(db, 'profiles', id))))
+        studentsSnaps.forEach((s) => {
+          if (s.exists()) {
+            const data = normalizeId<Database['public']['Tables']['profiles']['Row']>(s.id, s.data())
+            studentsMap[data.id] = data
+          }
         })
       }
     }

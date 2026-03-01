@@ -229,6 +229,18 @@ export async function getClassStudents(classId: string) {
   })) as ClassStudent[]
 }
 
+// Helper update total_students
+async function updateClassStudentCount(classId: string) {
+  const classStudentsCol = collection(db, 'class_students')
+  const q = query(classStudentsCol, where('class_id', '==', classId))
+  const snapshot = await getDocs(q)
+  const total = snapshot.size
+  await updateDoc(doc(db, 'classes', classId), {
+    total_students: total,
+    updated_at: Timestamp.fromDate(new Date()),
+  })
+}
+
 // Thêm học sinh vào lớp (admin hoặc giáo viên chủ nhiệm)
 export async function addStudentToClass(classId: string, studentId: string) {
   const now = new Date().toISOString()
@@ -242,6 +254,8 @@ export async function addStudentToClass(classId: string, studentId: string) {
   const profileRef = doc(db, 'profiles', studentId)
   await updateDoc(profileRef, { class_id: classId })
 
+  await updateClassStudentCount(classId)
+
   // Lấy thông tin student
   const studentDoc = await getDoc(profileRef)
   const studentData = studentDoc.exists() ? studentDoc.data() : null
@@ -253,11 +267,11 @@ export async function addStudentToClass(classId: string, studentId: string) {
     joined_at: now,
     student: studentData
       ? {
-          id: studentData.id || studentId,
-          full_name: studentData.full_name,
-          email: studentData.email,
-          student_code: studentData.student_code,
-        }
+        id: studentData.id || studentId,
+        full_name: studentData.full_name,
+        email: studentData.email,
+        student_code: studentData.student_code,
+      }
       : null,
   } as ClassStudent
 }
@@ -282,6 +296,8 @@ export async function removeStudentFromClass(classId: string, studentId: string)
   // Xóa class_id trong profiles
   const profileRef = doc(db, 'profiles', studentId)
   await updateDoc(profileRef, { class_id: null })
+
+  await updateClassStudentCount(classId)
 }
 
 // Học sinh tự chọn lớp (chỉ được chọn 1 lần)
@@ -315,6 +331,8 @@ export async function joinClass(classId: string) {
         const profileRef = doc(db, 'profiles', user.uid)
         await updateDoc(profileRef, { class_id: classId })
 
+        await updateClassStudentCount(classId)
+
         // Lấy thông tin class
         const classDoc = await getDoc(doc(db, 'classes', classId))
         const classData = classDoc.exists() ? classDoc.data() : null
@@ -326,11 +344,11 @@ export async function joinClass(classId: string) {
           joined_at: now,
           class: classData
             ? {
-                id: classDoc.id,
-                ...classData,
-                created_at: classData.created_at?.toDate?.()?.toISOString() || classData.created_at,
-                updated_at: classData.updated_at?.toDate?.()?.toISOString() || classData.updated_at,
-              }
+              id: classDoc.id,
+              ...classData,
+              created_at: classData.created_at?.toDate?.()?.toISOString() || classData.created_at,
+              updated_at: classData.updated_at?.toDate?.()?.toISOString() || classData.updated_at,
+            }
             : undefined,
         } as ClassStudent)
       } catch (error) {
