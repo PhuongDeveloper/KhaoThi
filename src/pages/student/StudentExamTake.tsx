@@ -41,11 +41,12 @@ export default function StudentExamTake() {
     onViolation: (violation) => {
       toast.error(`Vi phạm: ${violation.description}`, { duration: 5000, icon: '⚠️' })
     },
+    maxViolations: 1, // Strict: ngắt ngay lần đầu
     onMaxViolations: () => {
-      toast.error('Bạn đã vi phạm quá nhiều lần. Bài thi sẽ tự động nộp.')
+      toast.error('Bạn đã vi phạm quy chế thi. Bài thi sẽ tự động nộp.')
       handleSubmit()
     },
-    requireFullscreen: true,
+    requireFullscreen: window.innerWidth > 768, // Bỏ bắt buộc toàn màn hình trên mobile
     attemptId: attempt?.id,
   })
 
@@ -183,8 +184,28 @@ export default function StudentExamTake() {
       }
       setQuestions(shuffled)
 
-      if (now >= startTimeDate) {
+      const existingAttempts = await examApi.getAttempts(id!)
+      const inProgressAttempt = existingAttempts.find(a => a.status === 'in_progress')
+
+      if (inProgressAttempt) {
+        // Resume session
+        setAttempt(inProgressAttempt)
+        const elapsedSeconds = Math.floor((now.getTime() - new Date(inProgressAttempt.started_at!).getTime()) / 1000)
+        setTimeRemaining(Math.max(0, examData.duration_minutes * 60 - elapsedSeconds))
+        loadSavedAnswers(inProgressAttempt.id)
+        setExamStarted(true)
+        setCountdownBeforeStart(0)
+      } else if (now >= startTimeDate) {
+        // Only start a new one if NO in_progress attempt exists
         try {
+          // Check if already submitted
+          const submittedAttempt = existingAttempts.find(a => a.status === 'submitted' || a.status === 'timeout' || a.status === 'violation')
+          if (submittedAttempt) {
+            toast.error('Bạn đã làm bài thi này rồi.')
+            navigate(`/student/exams/${id}/result`)
+            return
+          }
+
           const attemptData = await examApi.startAttempt(id!)
           setAttempt(attemptData)
           setTimeRemaining(examData.duration_minutes * 60)
@@ -194,7 +215,9 @@ export default function StudentExamTake() {
         }
       }
 
-      await requestFullscreen()
+      if (window.innerWidth > 768) {
+        await requestFullscreen()
+      }
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi khởi tạo bài thi')
       navigate('/student/exams')
@@ -203,11 +226,20 @@ export default function StudentExamTake() {
     }
   }
 
-  // Start attempt when countdown ends
+  // Start attempt when countdown ends (only if no attempt exists)
   useEffect(() => {
     if (examStarted && !attempt && exam && id) {
       const startAttempt = async () => {
         try {
+          const existingAttempts = await examApi.getAttempts(id)
+          const inProgress = existingAttempts.find(a => a.status === 'in_progress')
+          if (inProgress) {
+            setAttempt(inProgress)
+            const elapsed = Math.floor((new Date().getTime() - new Date(inProgress.started_at!).getTime()) / 1000)
+            setTimeRemaining(Math.max(0, exam.duration_minutes * 60 - elapsed))
+            loadSavedAnswers(inProgress.id)
+            return
+          }
           const attemptData = await examApi.startAttempt(id)
           setAttempt(attemptData)
           setTimeRemaining(exam.duration_minutes * 60)
@@ -684,13 +716,13 @@ export default function StudentExamTake() {
           </div>
 
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-first lg:order-last mb-6 lg:mb-0">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 sticky top-24">
               <div className="p-4 border-b border-gray-200">
                 <h3 className="font-bold text-gray-900">Danh sách câu hỏi</h3>
                 <p className="text-xs text-gray-500 mt-1">{answeredCount}/{questions.length} câu đã làm</p>
               </div>
-              <div className="p-4 max-h-[calc(100vh-260px)] overflow-y-auto">
+              <div className="p-4 max-h-[250px] lg:max-h-[calc(100vh-260px)] overflow-y-auto">
                 {/* Type segments */}
                 {mcQuestions.length > 0 && (
                   <div className="mb-3">

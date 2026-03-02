@@ -50,7 +50,7 @@ export function useAntiCheat(options: UseAntiCheatOptions = {}) {
           const attempt = attemptDoc.data()
           const existingViolations = (attempt.violations_data as any[]) || []
           const updatedViolations = [...existingViolations, violation]
-          
+
           await updateDoc(doc(db, 'exam_attempts', attemptId), {
             violations_data: updatedViolations,
             violations_count: updatedViolations.length,
@@ -213,11 +213,23 @@ export function useAntiCheat(options: UseAntiCheatOptions = {}) {
       // Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
       if (
         e.key === 'F12' ||
-        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) ||
-        (e.ctrlKey && e.key === 'u')
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'i' || e.key === 'j')) ||
+        (e.ctrlKey && (e.key === 'u' || e.key === 'U'))
       ) {
         e.preventDefault()
-        addViolation('devtools', 'Cố gắng mở Developer Tools')
+        addViolation('devtools', 'Cố gắng mở Developer Tools hoặc xem source')
+      }
+
+      // Block Ctrl+C
+      if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
+        e.preventDefault()
+        addViolation('copy_shortcut', 'Cố gắng dùng phím tắt Copy')
+      }
+
+      // Block Ctrl+V
+      if (e.ctrlKey && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault()
+        addViolation('paste_shortcut', 'Cố gắng dùng phím tắt Paste')
       }
     }
 
