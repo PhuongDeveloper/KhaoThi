@@ -159,6 +159,7 @@ export async function createClass(classData: CreateClassData) {
   }
 
   const docRef = await addDoc(collection(db, 'classes'), newClass)
+  cache.invalidate(CACHE_KEYS.classes)
   return getClassById(docRef.id)
 }
 
@@ -169,12 +170,14 @@ export async function updateClass(id: string, classData: UpdateClassData) {
     ...classData,
     updated_at: Timestamp.fromDate(new Date()),
   })
+  cache.invalidate(CACHE_KEYS.classes)
   return getClassById(id)
 }
 
 // Xóa lớp học (chỉ admin)
 export async function deleteClass(id: string) {
   await deleteDoc(doc(db, 'classes', id))
+  cache.invalidate(CACHE_KEYS.classes)
 }
 
 // Lấy học sinh trong lớp

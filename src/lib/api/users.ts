@@ -1,14 +1,18 @@
-import { db } from '../firebase'
+import { db, firebaseConfig } from '../firebase'
 import type { Database } from '../supabase'
+import { initializeApp, deleteApp } from 'firebase/app'
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import {
   collection,
   doc,
   getDoc,
   getDocs,
   updateDoc,
+  setDoc,
   query,
   where,
   orderBy,
+  Timestamp
 } from 'firebase/firestore'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -72,6 +76,67 @@ export const userApi = {
     const profileRef = doc(db, 'profiles', id)
     await updateDoc(profileRef, profile as any)
     return this.getById(id)
+  },
+
+  async bulkCreateStudents(students: { full_name: string, base_email: string }[], commonPassword: string) {
+    const results: any[] = []
+
+    // Tạo Secondary App để không làm logout admin hiện tại
+    const secondaryAppName = `SecondaryApp_${Date.now()}`
+    const secondaryApp = initializeApp(firebaseConfig, secondaryAppName)
+    const secondaryAuth = getAuth(secondaryApp)
+
+    try {
+      for (const student of students) {
+        let currentEmail = student.base_email
+        let counter = 1
+        let userCredential = null
+
+        while (!userCredential) {
+          try {
+            userCredential = await createUserWithEmailAndPassword(secondaryAuth, currentEmail, commonPassword)
+          } catch (error: any) {
+            if (error.code === 'auth/email-already-in-use') {
+              // Tìm email mới bằng cách thêm số vào sau tên
+              const emailParts = student.base_email.split('@')
+              currentEmail = `${emailParts[0]}${counter}@${emailParts[1]}`
+              counter++
+            } else {
+              throw error // Lỗi khác thì ném ra
+            }
+          }
+        }
+
+        const user = userCredential.user
+        const now = Timestamp.fromDate(new Date())
+
+        const profileData = {
+          id: user.uid,
+          email: currentEmail,
+          full_name: student.full_name,
+          role: 'student',
+          student_code: null,
+          teacher_code: null,
+          class_id: null,
+          created_at: now,
+          updated_at: now,
+        }
+
+        await setDoc(doc(db, 'profiles', user.uid), profileData)
+
+        results.push({
+          id: user.uid,
+          full_name: student.full_name,
+          email: currentEmail,
+          password: commonPassword
+        })
+      }
+    } finally {
+      // Xóa app sau khi hoàn thành
+      await deleteApp(secondaryApp)
+    }
+
+    return results
   },
 }
 

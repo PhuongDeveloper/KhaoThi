@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: 'AIzaSyDJ70ETjbOh114bEFN0YVD5LQSxNXH7pHc',
   authDomain: 'khao-thi-online.firebaseapp.com',
   projectId: 'khao-thi-online',
