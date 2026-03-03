@@ -10,6 +10,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import { useConfirm } from '../../hooks/useConfirm'
 import * as XLSX from 'xlsx'
 import { addStudentToClass } from '../../lib/api/classes'
+import { extractStudentNamesFromText } from '../../lib/api/gemini'
 
 function removeVietnameseTones(str: string) {
   str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
@@ -112,15 +113,32 @@ export default function AdminClasses() {
             const wb = XLSX.read(data, { type: 'array' });
             const wsname = wb.SheetNames[0];
             const ws = wb.Sheets[wsname];
-            const jsonData = XLSX.utils.sheet_to_json(ws);
+
+            // Trích xuất raw text CSV
+            const csvData = XLSX.utils.sheet_to_csv(ws);
+
+            if (!csvData) {
+              toast.error('File Excel không có dữ liệu để phân tích.', { id: 'bulk-create' });
+              setIsCreatingBulk(false);
+              return;
+            }
+
+            toast.loading('AI đang phân tích danh sách lớp học...', { id: 'bulk-create' });
+            let extractedNames: string[] = [];
+            try {
+              extractedNames = await extractStudentNamesFromText(csvData, 'admin');
+            } catch (aiErr: any) {
+              toast.error('Lỗi khi phân tích bằng AI: ' + aiErr.message, { id: 'bulk-create' });
+              setIsCreatingBulk(false);
+              return;
+            }
 
             const studentsToCreate: { full_name: string, base_email: string }[] = [];
-            for (const row of jsonData as any[]) {
-              let fullName = row['Họ và Tên'] || row['Họ và tên'] || row['Họ tên'] || row['Name'] || row['name'] || row['Họ Tên'];
-              if (fullName) {
+            for (const fullName of extractedNames) {
+              if (fullName.trim()) {
                 studentsToCreate.push({
-                  full_name: fullName,
-                  base_email: generateBaseEmail(fullName)
+                  full_name: fullName.trim(),
+                  base_email: generateBaseEmail(fullName.trim())
                 });
               }
             }
@@ -139,7 +157,7 @@ export default function AdminClasses() {
                 toast.error('Lỗi tạo tài khoản: ' + error.message, { id: 'bulk-create' });
               }
             } else {
-              toast.error('Không tìm thấy cột Họ và Tên trong file Excel!');
+              toast.error('AI không tìm thấy tên học sinh nào trong file Excel hoặc định dạng rỗng!', { id: 'bulk-create' });
             }
             setIsCreatingBulk(false);
           };
@@ -319,121 +337,131 @@ export default function AdminClasses() {
 
       {/* Modal thêm/sửa lớp */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">
-              {editingClass ? 'Sửa lớp học' : 'Thêm lớp học mới'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Tên lớp *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="input w-full"
-                  required
-                  placeholder="Ví dụ: 10A1"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Mã lớp *</label>
-                <input
-                  type="text"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                  className="input w-full"
-                  required
-                  placeholder="Ví dụ: 10A1-2024"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Giáo viên chủ nhiệm</label>
-                <select
-                  value={formData.homeroom_teacher_id || ''}
-                  onChange={(e) => setFormData({ ...formData, homeroom_teacher_id: e.target.value || null })}
-                  className="input w-full"
-                >
-                  <option value="">Chọn giáo viên</option>
-                  {teachers.map((teacher) => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.full_name} {teacher.email ? `(${teacher.email})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Mô tả</label>
-                <textarea
-                  value={formData.description || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="input w-full"
-                  rows={3}
-                  placeholder="Mô tả về lớp học..."
-                />
-              </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[50] p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 shrink-0">
+              <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
+                {editingClass ? 'Sửa thông tin lớp học' : 'Tạo lớp học mới'}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {editingClass ? 'Cập nhật lại các thông tin của lớp' : 'Khởi tạo lớp học mới và danh sách học viên'}
+              </p>
+            </div>
 
-              {!editingClass && (
-                <div className="border hover:border-blue-500 rounded p-4 space-y-3 bg-gray-50 transition-colors">
-                  <label className="flex items-center gap-2 cursor-pointer font-medium text-gray-800">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                      checked={useAI}
-                      onChange={(e) => setUseAI(e.target.checked)}
-                    />
-                    Tạo danh sách lớp nhanh với AI (Nhập từ file Excel)
-                  </label>
+            <div className="p-6 overflow-y-auto flex-1">
+              <form id="class-form" onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tên lớp <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="input w-full bg-gray-50/50 focus:bg-white transition-colors"
+                    required
+                    placeholder="Ví dụ: 10A1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mã lớp <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                    className="input w-full bg-gray-50/50 focus:bg-white transition-colors"
+                    required
+                    placeholder="Ví dụ: 10A1-2024"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Giáo viên chủ nhiệm</label>
+                  <select
+                    value={formData.homeroom_teacher_id || ''}
+                    onChange={(e) => setFormData({ ...formData, homeroom_teacher_id: e.target.value || null })}
+                    className="input w-full bg-gray-50/50 focus:bg-white transition-colors"
+                  >
+                    <option value="">-- Chọn giáo viên --</option>
+                    {teachers.map((teacher) => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.full_name} {teacher.email ? `(${teacher.email})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Mô tả thêm</label>
+                  <textarea
+                    value={formData.description || ''}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="input w-full bg-gray-50/50 focus:bg-white transition-colors resize-none"
+                    rows={2}
+                    placeholder="Sĩ số, phân ban, hoặc ghi chú khác..."
+                  />
+                </div>
 
-                  {useAI && (
-                    <div className="space-y-3 pl-6 mt-2">
-                      <div>
-                        <label className="block text-sm font-medium mb-1 text-gray-700">File Excel chứa danh sách (*.xlsx, *.xls)</label>
+                {!editingClass && (
+                  <div className={`overflow-hidden rounded-xl border-2 transition-all duration-300 ${useAI ? 'border-primary-500 bg-primary-50/30' : 'border-gray-200 bg-gray-50/50 hover:border-gray-300'
+                    }`}>
+                    <label className="flex items-center gap-3 cursor-pointer p-4 font-medium text-gray-800 focus-within:bg-gray-100/50 transition-colors">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500"
+                        checked={useAI}
+                        onChange={(e) => setUseAI(e.target.checked)}
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm font-bold">Tạo danh sách lớp nhanh với AI (Khuyên dùng)</div>
+                        <div className="text-xs text-gray-500 mt-0.5 font-normal">Chỉ cần File Excel bất kỳ (không cần đúng Header) - AI tự bóc tách Họ tên!</div>
+                      </div>
+                    </label>
+
+                    <div className={`transition-all duration-300 pl-11 pr-4 pb-4 space-y-4 ${useAI ? 'opacity-100 max-h-96' : 'opacity-0 max-h-0 hidden'
+                      }`}>
+                      <div className="pt-2">
+                        <label className="block text-sm font-semibold mb-1.5 text-gray-700">Tệp danh sách (*.xlsx, *.xls)</label>
                         <input
                           type="file"
                           accept=".xlsx, .xls"
                           onChange={(e) => setExcelFile(e.target.files?.[0] || null)}
-                          className="input w-full text-sm p-1.5"
+                          className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 transition-all cursor-pointer border border-gray-200 rounded-lg bg-white"
                           required={useAI}
                         />
-                        <p className="text-xs text-gray-500 mt-1">Lưu ý: File Excel cần có cột <strong>Họ và Tên</strong> hoặc <strong>Họ Tên</strong>.</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1 text-gray-700">Mật khẩu chung cho toàn bộ tài khoản</label>
+                        <label className="block text-sm font-semibold mb-1.5 text-gray-700">Mật khẩu chung cho tất cả tài khoản</label>
                         <input
                           type="text"
-                          placeholder="Mật khẩu ít nhất 6 ký tự"
+                          placeholder="Ít nhất 6 ký tự. Ví dụ: 123456"
                           value={commonPassword}
                           onChange={(e) => setCommonPassword(e.target.value)}
-                          className="input w-full"
+                          className="input w-full bg-white transition-colors"
                           required={useAI}
                           minLength={6}
                         />
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </form>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false)
-                    setEditingClass(null)
-                    setUseAI(false)
-                    setExcelFile(null)
-                  }}
-                  className="btn btn-outline"
-                  disabled={isCreatingBulk}
-                >
-                  Hủy
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={isCreatingBulk}>
-                  {isCreatingBulk ? 'Đang xử lý...' : (editingClass ? 'Cập nhật' : 'Tạo')}
-                </button>
-              </div>
-            </form>
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-xl shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false)
+                  setEditingClass(null)
+                  setUseAI(false)
+                  setExcelFile(null)
+                }}
+                className="btn btn-outline bg-white hover:bg-gray-100 focus:ring-2 focus:ring-gray-200"
+                disabled={isCreatingBulk}
+              >
+                Đóng
+              </button>
+              <button form="class-form" type="submit" className="btn btn-primary" disabled={isCreatingBulk}>
+                {isCreatingBulk ? 'Hệ thống đang xử lý...' : (editingClass ? 'Lưu cập nhật' : 'Xác nhận Khởi tạo')}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -445,34 +473,34 @@ export default function AdminClasses() {
             <h2 className="text-xl font-bold mb-4 text-green-600">
               Tạo danh sách tài khoản thành công!
             </h2>
-            <p className="mb-4 text-gray-600">Đã tạo {bulkResults.length} tài khoản cho học sinh. Các tài khoản này đã được tự động thêm vào lớp.</p>
+            <p className="mb-4 text-gray-600">Đã tạo <strong>{bulkResults.length}</strong> tài khoản cho học sinh. Các tài khoản này đã được tự động thêm vào lớp.</p>
 
             <div className="overflow-y-auto border border-gray-200 rounded mb-4" style={{ maxHeight: '50vh' }}>
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-100 sticky top-0">
                   <tr>
-                    <th className="p-3 border-b border-gray-200">Họ và Tên</th>
-                    <th className="p-3 border-b border-gray-200">Email</th>
-                    <th className="p-3 border-b border-gray-200">Mật khẩu</th>
+                    <th className="p-3 border-b border-gray-200 font-semibold text-gray-700">Họ và Tên</th>
+                    <th className="p-3 border-b border-gray-200 font-semibold text-gray-700">Email đăng nhập</th>
+                    <th className="p-3 border-b border-gray-200 font-semibold text-gray-700">Mật khẩu</th>
                   </tr>
                 </thead>
                 <tbody>
                   {bulkResults.map((r, i) => (
-                    <tr key={i} className="border-b hover:bg-gray-50">
-                      <td className="p-3 font-medium">{r.full_name}</td>
-                      <td className="p-3 text-gray-600">{r.email}</td>
-                      <td className="p-3 font-mono text-gray-500">{r.password}</td>
+                    <tr key={i} className="border-b hover:bg-gray-50 transition-colors">
+                      <td className="p-3 font-medium text-gray-800">{r.full_name}</td>
+                      <td className="p-3 text-blue-600 font-mono text-xs">{r.email}</td>
+                      <td className="p-3 font-mono text-gray-500 text-xs">{r.password}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            <div className="flex justify-between items-center mt-auto pt-2 border-t">
-              <button onClick={() => setShowResultModal(false)} className="btn btn-outline text-gray-600 border-gray-300">
+            <div className="flex justify-end items-center mt-auto pt-4 border-t border-gray-100 gap-3">
+              <button onClick={() => setShowResultModal(false)} className="btn btn-outline text-gray-600 border-gray-300 hover:bg-gray-50">
                 Đóng
               </button>
-              <button onClick={handleExportResults} className="btn bg-green-500 hover:bg-green-600 text-white shadow font-semibold">
+              <button onClick={handleExportResults} className="btn bg-green-600 hover:bg-green-700 text-white shadow font-semibold">
                 Xuất file Excel danh sách tài khoản
               </button>
             </div>

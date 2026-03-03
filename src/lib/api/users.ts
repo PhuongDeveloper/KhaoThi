@@ -15,6 +15,9 @@ import {
   Timestamp
 } from 'firebase/firestore'
 
+// Hàm sleep để tránh QUIC Protocol Error do spam requests
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 type Profile = Database['public']['Tables']['profiles']['Row']
 
 export const userApi = {
@@ -130,6 +133,9 @@ export const userApi = {
           email: currentEmail,
           password: commonPassword
         })
+
+        // NGHỈ 600ms ĐỂ TRÁNH LỖI MẠNG (QUIC_PROTOCOL_ERROR / Spamming)
+        await delay(600)
       }
     } finally {
       // Xóa app sau khi hoàn thành

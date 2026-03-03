@@ -84,8 +84,8 @@ async function checkApiLimit(teacherId: string): Promise<boolean> {
           createdAtRaw?.toDate?.() instanceof Date
             ? createdAtRaw.toDate()
             : createdAtRaw
-            ? new Date(createdAtRaw)
-            : null
+              ? new Date(createdAtRaw)
+              : null
 
         if (!createdAt) return sum
         if (createdAt < today || createdAt >= tomorrow) return sum
@@ -130,9 +130,9 @@ function fileToBase64(file: File): Promise<string> {
 // Hàm xác định MIME type
 function getMimeType(fileName: string, fileType: string): string {
   const ext = fileName.toLowerCase().split('.').pop()
-  
+
   if (fileType) return fileType
-  
+
   switch (ext) {
     case 'pdf': return 'application/pdf'
     case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -294,7 +294,7 @@ export async function autoCalculateAnswers(
   // Tạo prompt với tất cả câu hỏi
   const questionsText = questions.map((q, idx) => {
     let questionText = `Câu ${idx + 1} (${q.question_type}): ${q.content}\n`
-    
+
     if (q.question_type === 'multiple_choice' && q.answers) {
       questionText += 'Các đáp án:\n'
       q.answers.forEach((a, aidx) => {
@@ -308,7 +308,7 @@ export async function autoCalculateAnswers(
     } else if (q.question_type === 'short_answer') {
       questionText += `(Câu hỏi trả lời ngắn - cần đáp án số)\n`
     }
-    
+
     return questionText
   }).join('\n')
 
@@ -566,6 +566,85 @@ Chỉ trả về JSON, không có text thêm.`
     return analysis
   } catch (error) {
     throw error
+  }
+}
+
+// Trích xuất họ và tên học sinh từ raw text của Excel
+export async function extractStudentNamesFromText(
+  text: string,
+  teacherId: string = 'admin' // Mặc định là admin cho action này
+): Promise<string[]> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('Gemini API key không được cấu hình')
+  }
+
+  // Kiểm tra giới hạn API
+  const canCall = await checkApiLimit(teacherId)
+  if (!canCall) {
+    throw new Error('Đã vượt quá giới hạn số lần gọi API trong ngày')
+  }
+
+  const prompt = `Bạn là một trợ lý AI phân tích dữ liệu chuyên nghiệp. Nhiệm vụ của bạn là lấy ra danh sách các mảng "Họ và Tên" của học sinh có trong văn bản thô (thường là từ file Excel/CSV do người dùng đưa vào).
+Hãy loại bỏ các tiêu đề thừa (SỐ THỨ TỰ, GIỚI TÍNH, SĐT, STT, NĂM SINH...).
+Chỉ cần lấy đúng tên người. Bạn cần phải đảm bảo không bỏ sót tên nào thực sự là tên người.
+Không lấy các cụm từ không phải là tên riêng.
+
+Văn bản thô cần phân tích:
+${text}
+
+Yêu cầu:
+Trả về duy nhất 1 JSON Array chứa danh sách các họ tên dưới dạng String.
+Format JSON bắt buộc như sau:
+{
+  "names": [
+    "Nguyễn Văn A",
+    "Trần Thị B",
+    "Lê Hoàng C"
+  ]
+}
+
+Chỉ trả về JSON, tuyệt đối không có text nào thêm ở xung quanh.`
+
+  try {
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    const responseText = data.candidates[0]?.content?.parts[0]?.text || ''
+
+    // Parse JSON
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('Gemini trả về format không hợp lệ (không tìm thấy JSON)')
+    }
+
+    const parsed = JSON.parse(jsonMatch[0])
+
+    // Ghi nhận
+    await recordApiCall(teacherId, 'bulk_create_users', 1)
+
+    return parsed.names || []
+  } catch (error) {
+    throw error // Re-throw
   }
 }
 
