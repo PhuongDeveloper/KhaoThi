@@ -144,5 +144,55 @@ export const userApi = {
 
     return results
   },
+
+  async createUser(data: {
+    full_name: string
+    email: string
+    password: string
+    role: 'admin' | 'teacher' | 'student'
+    student_code?: string
+    teacher_code?: string
+    class_id?: string | null
+  }) {
+    // Dùng Secondary App để không logout admin hiện tại
+    const secondaryAppName = `SecondaryApp_${Date.now()}`
+    const secondaryApp = initializeApp(firebaseConfig, secondaryAppName)
+    const secondaryAuth = getAuth(secondaryApp)
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.password)
+      const user = userCredential.user
+      const now = Timestamp.fromDate(new Date())
+
+      const profileData: any = {
+        id: user.uid,
+        email: data.email,
+        full_name: data.full_name,
+        role: data.role,
+        student_code: data.student_code || null,
+        teacher_code: data.teacher_code || null,
+        class_id: data.class_id || null,
+        created_at: now,
+        updated_at: now,
+      }
+
+      await setDoc(doc(db, 'profiles', user.uid), profileData)
+
+      // Nếu có class_id và là student, thêm vào class_students
+      if (data.role === 'student' && data.class_id) {
+        const { addStudentToClass } = await import('./classes')
+        await addStudentToClass(data.class_id, user.uid)
+      }
+
+      return {
+        id: user.uid,
+        ...profileData,
+        created_at: now.toDate().toISOString(),
+        updated_at: now.toDate().toISOString(),
+      }
+    } finally {
+      await deleteApp(secondaryApp)
+    }
+  },
 }
 

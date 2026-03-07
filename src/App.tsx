@@ -3,8 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from './store/authStore'
 import LoginPage from './pages/auth/LoginPage'
-import RegisterPage from './pages/auth/RegisterPage'
-import AuthCallback from './pages/auth/AuthCallback'
+
 import AdminLayout from './layouts/AdminLayout'
 import TeacherLayout from './layouts/TeacherLayout'
 import StudentLayout from './layouts/StudentLayout'
@@ -18,7 +17,7 @@ function App() {
   useEffect(() => {
     const fixLocalhostRedirect = () => {
       const currentOrigin = window.location.origin
-      
+
       // Nếu detect redirect về localhost, fix ngay lập tức
       if (currentOrigin.includes('localhost:3000') || currentOrigin.includes('localhost')) {
         const productionUrl = 'https://www.hethongthi.online'
@@ -30,24 +29,24 @@ function App() {
         return
       }
     }
-    
+
     fixLocalhostRedirect()
     window.addEventListener('popstate', fixLocalhostRedirect)
     window.addEventListener('hashchange', fixLocalhostRedirect)
-    
+
     const originalPushState = history.pushState
     const originalReplaceState = history.replaceState
-    
-    history.pushState = function(...args) {
+
+    history.pushState = function (...args) {
       originalPushState.apply(history, args)
       setTimeout(fixLocalhostRedirect, 0)
     }
-    
-    history.replaceState = function(...args) {
+
+    history.replaceState = function (...args) {
       originalReplaceState.apply(history, args)
       setTimeout(fixLocalhostRedirect, 0)
     }
-    
+
     return () => {
       window.removeEventListener('popstate', fixLocalhostRedirect)
       window.removeEventListener('hashchange', fixLocalhostRedirect)
@@ -70,7 +69,7 @@ function App() {
         useAuthStore.setState({ initialized: true, loading: false })
       }
     }, 5000)
-    
+
     return () => clearTimeout(timeout)
   }, [initialized, loading])
 
@@ -87,9 +86,8 @@ function App() {
       <Toaster position="top-right" />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        
+        <Route path="/register" element={<Navigate to="/login" replace />} />
+
         <Route
           path="/admin/*"
           element={
@@ -98,7 +96,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/teacher/*"
           element={
@@ -107,7 +105,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
+
         <Route
           path="/student/*"
           element={
@@ -116,7 +114,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        
+
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

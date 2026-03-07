@@ -3,7 +3,6 @@ import { persist } from 'zustand/middleware'
 import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
-  signInWithPopup,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
@@ -20,7 +19,7 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore'
-import { auth, googleProvider, db } from '@/lib/firebase'
+import { auth, db } from '@/lib/firebase'
 
 interface Profile {
   id: string
@@ -40,7 +39,6 @@ interface AuthState {
   loading: boolean
   initialized: boolean
   signIn: (email: string, password: string) => Promise<{ profile: Profile | null } | void>
-  signInWithGoogle: () => Promise<void>
   signUp: (email: string, password: string, fullName: string) => Promise<void>
   signOut: () => Promise<void>
   fetchProfile: () => Promise<Profile | null>
@@ -121,24 +119,6 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      signInWithGoogle: async () => {
-        try {
-          const cred = await signInWithPopup(auth, googleProvider)
-          const user = cred.user
-          set({ user, session: null })
-          if (user) {
-            try {
-              await get().fetchProfile()
-            } catch (profileError: any) {
-              console.error('[AuthStore] Lỗi khi fetch profile sau Google login:', profileError)
-              throw new Error(`Đăng nhập Google thành công nhưng không thể tải profile: ${profileError.message}`)
-            }
-          }
-        } catch (error: any) {
-          console.error('[AuthStore] Lỗi đăng nhập Google:', error)
-          throw new Error(error.message || 'Đăng nhập với Google thất bại')
-        }
-      },
 
       signUp: async (email: string, password: string, fullName: string) => {
         set({ loading: true })
@@ -203,7 +183,7 @@ export const useAuthStore = create<AuthState>()(
 
           if (!snapshot.exists()) {
             console.log('[AuthStore] Profile không tồn tại, đang tạo mới...')
-            
+
             // Kiểm tra xem đã có admin nào trong hệ thống chưa
             let isFirstAdmin = true
             try {
@@ -236,10 +216,10 @@ export const useAuthStore = create<AuthState>()(
             }
 
             console.log('[AuthStore] Đang tạo profile với role:', newProfileData.role)
-            
+
             // Tạo profile trong Firestore
             await setDoc(profileRef, newProfileData)
-            
+
             console.log('[AuthStore] Đã tạo profile thành công trong Firestore')
 
             const newProfile: Profile = {

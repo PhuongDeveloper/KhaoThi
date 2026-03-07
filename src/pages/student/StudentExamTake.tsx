@@ -27,24 +27,29 @@ export default function StudentExamTake() {
   const [submitting, setSubmitting] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('single')
   const [timeAlertShown, setTimeAlertShown] = useState<Record<string, boolean>>({})
+  const [examDone, setExamDone] = useState(false)
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const attemptRef = useRef<any>(null)
   const examRef = useRef<any>(null)
   const timeRemainingRef = useRef(0)
   const violationsRef = useRef<any[]>([])
+  const examDoneRef = useRef(false)
 
   useEffect(() => { attemptRef.current = attempt }, [attempt])
   useEffect(() => { examRef.current = exam }, [exam])
   useEffect(() => { timeRemainingRef.current = timeRemaining }, [timeRemaining])
+  useEffect(() => { examDoneRef.current = examDone }, [examDone])
 
   const { violations, violationCount, currentViolation, requestFullscreen, isFullscreen } = useAntiCheat({
     onViolation: (violation) => {
+      // Chỉ ghi nhận nếu bài chưa nộp
+      if (examDoneRef.current) return
       toast.error(`Vi phạm: ${violation.description}`, { duration: 5000, icon: '⚠️' })
     },
-    maxViolations: 1, // Strict: ngắt ngay lần đầu
+    maxViolations: 99, // Không tự động nộp bài khi vi phạm
     onMaxViolations: () => {
-      toast.error('Bạn đã vi phạm quy chế thi. Bài thi sẽ tự động nộp.')
-      handleSubmit()
+      // Chỉ cảnh báo, KHÔNG tự nộp bài
+      toast.error('Bạn đã vi phạm nhiều lần. Giáo viên đã được ghi nhận vi phạm của bạn.', { duration: 8000 })
     },
     requireFullscreen: window.innerWidth > 768, // Bỏ bắt buộc toàn màn hình trên mobile
     attemptId: attempt?.id,
@@ -284,13 +289,21 @@ export default function StudentExamTake() {
   }
 
   const handleSubmit = useCallback(async () => {
-    if (submitting) return
+    if (submitting || examDoneRef.current) return
     setSubmitting(true)
+    setExamDone(true)
+    examDoneRef.current = true
     try {
       const currentAttempt = attemptRef.current
       const currentExam = examRef.current
       const currentTime = timeRemainingRef.current
       if (currentAttempt) {
+        // Idempotent: kiểm tra trạng thái trước khi nộp
+        if (currentAttempt.status && currentAttempt.status !== 'in_progress') {
+          toast('Bài thi đã được nộp trước đó.', { icon: 'ℹ️' })
+          navigate(`/student/exams/${id}/result`)
+          return
+        }
         const timeSpent = (currentExam?.duration_minutes || 0) * 60 - currentTime
         await examApi.submitExam(currentAttempt.id, timeSpent, violationsRef.current)
         localStorage.removeItem(`exam_answers_${currentAttempt.id}`)
@@ -298,6 +311,8 @@ export default function StudentExamTake() {
         navigate(`/student/exams/${id}/result`)
       }
     } catch (error: any) {
+      examDoneRef.current = false
+      setExamDone(false)
       toast.error(error.message || 'Lỗi khi nộp bài')
     } finally {
       setSubmitting(false)
