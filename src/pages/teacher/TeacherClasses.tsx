@@ -3,7 +3,8 @@ import { getMyHomeroomClasses, getClassStudents, addStudentToClass, removeStuden
 import { userApi } from '../../lib/api/users'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../components/LoadingSpinner'
-import { UserPlus, FileSpreadsheet, X } from 'lucide-react'
+import { UserPlus, FileSpreadsheet, X, Download } from 'lucide-react'
+import * as XLSX from 'xlsx'
 
 export default function TeacherClasses() {
   const [classes, setClasses] = useState<Class[]>([])
@@ -192,6 +193,20 @@ export default function TeacherClasses() {
     }
   }
 
+  const handleExportStudents = () => {
+    if (!selectedClass || students.length === 0) return
+    const ws = XLSX.utils.json_to_sheet(students.map((item, index) => ({
+      'STT': index + 1,
+      'Họ và Tên': item.student?.full_name || '',
+      'Email': item.student?.email || '',
+      'Mã học sinh': item.student?.student_code || '',
+      'Ngày tham gia': new Date(item.joined_at).toLocaleDateString('vi-VN')
+    })))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Danh sách học sinh")
+    XLSX.writeFile(wb, `Danh_sach_lop_${selectedClass.name}.xlsx`)
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -264,6 +279,14 @@ export default function TeacherClasses() {
                     className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors font-medium"
                   >
                     Thêm học sinh có sẵn
+                  </button>
+                  <button
+                    onClick={handleExportStudents}
+                    disabled={students.length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500 text-white text-sm rounded-lg hover:bg-yellow-600 transition-colors font-medium disabled:opacity-50"
+                  >
+                    <Download className="h-4 w-4" />
+                    Xuất Excel
                   </button>
                 </div>
               </div>

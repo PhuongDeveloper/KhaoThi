@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
-import { getClasses, createClass, updateClass, deleteClass, type Class, type CreateClassData } from '../../lib/api/classes'
+import { getClasses, createClass, updateClass, deleteClass, getClassStudents, type Class, type CreateClassData } from '../../lib/api/classes'
 import { userApi } from '../../lib/api/users'
 import toast from 'react-hot-toast'
-import { Users } from 'lucide-react'
+import { Users, Download, Loader2 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import EmptyState from '../../components/EmptyState'
 import PageHeader from '../../components/PageHeader'
@@ -64,6 +64,7 @@ export default function AdminClasses() {
   const [bulkResults, setBulkResults] = useState<any[]>([])
   const [showResultModal, setShowResultModal] = useState(false)
   const [isCreatingBulk, setIsCreatingBulk] = useState(false)
+  const [exportingId, setExportingId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -194,6 +195,34 @@ export default function AdminClasses() {
     XLSX.writeFile(wb, `Danh_sach_tai_khoan_lop.xlsx`);
   }
 
+  const handleExportStudents = async (classItem: Class) => {
+    try {
+      setExportingId(classItem.id)
+      const students = await getClassStudents(classItem.id)
+
+      if (students.length === 0) {
+        toast.error('Lớp học này chưa có học sinh nào.')
+        return
+      }
+
+      const ws = XLSX.utils.json_to_sheet(students.map((item, index) => ({
+        'STT': index + 1,
+        'Họ và Tên': item.student?.full_name || '',
+        'Email': item.student?.email || '',
+        'Mã học sinh': item.student?.student_code || '',
+        'Ngày tham gia': new Date(item.joined_at).toLocaleDateString('vi-VN')
+      })))
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Danh sách học sinh")
+      XLSX.writeFile(wb, `Danh_sach_lop_${classItem.name}.xlsx`)
+      toast.success('Đã xuất file Excel thành công.')
+    } catch (error: any) {
+      toast.error('Có lỗi xảy ra khi xuất danh sách: ' + error.message)
+    } finally {
+      setExportingId(null)
+    }
+  }
+
   const handleEdit = (classItem: Class) => {
     setEditingClass(classItem)
     setFormData({
@@ -306,6 +335,18 @@ export default function AdminClasses() {
                           title="Chỉnh sửa"
                         >
                           Sửa
+                        </button>
+                        <button
+                          onClick={() => handleExportStudents(classItem)}
+                          disabled={exportingId === classItem.id}
+                          className="px-3 py-1.5 text-sm font-medium text-white bg-yellow-500 hover:bg-yellow-600 rounded transition-colors flex items-center justify-center min-w-[32px] disabled:opacity-50"
+                          title="Xuất danh sách học sinh (Excel)"
+                        >
+                          {exportingId === classItem.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
                         </button>
                         <button
                           onClick={() => handleDelete(classItem.id)}
