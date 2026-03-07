@@ -75,6 +75,37 @@ export default function TeacherExamCreate() {
     }, 200)
 
     try {
+      let finalFile = file;
+      const fileName = file.name.toLowerCase();
+
+      if (fileName.endsWith('.doc')) {
+        throw new Error('Định dạng .doc cũ không được AI hỗ trợ. Vui lòng mở bằng Word và lưu lại (Save As) sang định dạng .docx hoặc .pdf');
+      }
+
+      if (fileName.endsWith('.docx')) {
+        const mammoth = await import('mammoth');
+        const buffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+        if (result.value) {
+          const blob = new Blob([result.value], { type: 'text/plain' });
+          finalFile = new File([blob], 'extracted-text.txt', { type: 'text/plain' });
+        } else {
+          throw new Error('Không thể đọc dữ liệu văn bản từ file Word này. Hãy thử trích xuất bằng tay (copy-paste) hoặc lưu dạng PDF.');
+        }
+      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        const XLSX = await import('xlsx');
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer);
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const csv = XLSX.utils.sheet_to_csv(ws);
+        if (csv) {
+          const blob = new Blob([csv], { type: 'text/plain' });
+          finalFile = new File([blob], 'extracted-text.txt', { type: 'text/plain' });
+        } else {
+          throw new Error('Không tìm thấy dữ liệu trong file Excel.');
+        }
+      }
+
       // Tạo exam tạm để có examId
       const examData = {
         ...formData,
@@ -89,7 +120,7 @@ export default function TeacherExamCreate() {
 
       // Gửi file trực tiếp cho AI để phân tích
       const questions = await analyzeFileAndExtractQuestions(
-        file,
+        finalFile,
         tempExam.id,
         profile?.id || ''
       )

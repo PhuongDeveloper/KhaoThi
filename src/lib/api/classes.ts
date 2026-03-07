@@ -209,21 +209,29 @@ export async function getClassStudents(classId: string) {
       new Date(a.joined_at || 0).getTime() - new Date(b.joined_at || 0).getTime()
   )
 
-  // Lấy thông tin students
+  // Lấy thông tin students (chia nhỏ mảng ids để tránh lỗi giới hạn 30 item trong IN query Firebase)
   const studentsMap: Record<string, any> = {}
   if (studentIds.size > 0) {
     const profilesCol = collection(db, 'profiles')
-    const studentsQuery = query(profilesCol, where('id', 'in', Array.from(studentIds)))
-    const studentsSnap = await getDocs(studentsQuery)
-    studentsSnap.forEach((s) => {
-      const data = s.data()
-      studentsMap[data.id || s.id] = {
-        id: data.id || s.id,
-        full_name: data.full_name,
-        email: data.email,
-        student_code: data.student_code,
-      }
-    })
+    const idsArray = Array.from(studentIds)
+
+    // Chunk array thành từng nhóm tối đa 30 phần tử
+    const chunkSize = 30
+    for (let i = 0; i < idsArray.length; i += chunkSize) {
+      const chunk = idsArray.slice(i, i + chunkSize)
+      const studentsQuery = query(profilesCol, where('id', 'in', chunk))
+      const studentsSnap = await getDocs(studentsQuery)
+
+      studentsSnap.forEach((s) => {
+        const data = s.data()
+        studentsMap[data.id || s.id] = {
+          id: data.id || s.id,
+          full_name: data.full_name,
+          email: data.email,
+          student_code: data.student_code,
+        }
+      })
+    }
   }
 
   return classStudents.map((cs) => ({
