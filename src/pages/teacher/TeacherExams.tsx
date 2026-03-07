@@ -19,6 +19,8 @@ export default function TeacherExams() {
     classId: '',
     startDate: '',
     startTime: '',
+    endDate: '',
+    endTime: '',
   })
 
   // Tự động nộp bài khi hết giờ (kiểm tra mỗi phút)
@@ -64,14 +66,35 @@ export default function TeacherExams() {
   const handleOpenAssignModal = (exam: any) => {
     setSelectedExam(exam)
     setShowAssignModal(true)
-    // Set default values - thời gian bắt đầu mặc định là 5 phút sau
-    const now = new Date()
-    const defaultStart = new Date(now.getTime() + 5 * 60 * 1000) // 5 phút sau
-    
+
+    let defaultStartDate = ''
+    let defaultStartTime = ''
+    let defaultEndDate = ''
+    let defaultEndTime = ''
+
+    if (exam.start_time) {
+      const start = new Date(exam.start_time)
+      defaultStartDate = start.toISOString().split('T')[0]
+      defaultStartTime = start.toTimeString().slice(0, 5)
+    } else {
+      const now = new Date()
+      const defaultStart = new Date(now.getTime() + 5 * 60 * 1000)
+      defaultStartDate = defaultStart.toISOString().split('T')[0]
+      defaultStartTime = defaultStart.toTimeString().slice(0, 5)
+    }
+
+    if (exam.end_time) {
+      const end = new Date(exam.end_time)
+      defaultEndDate = end.toISOString().split('T')[0]
+      defaultEndTime = end.toTimeString().slice(0, 5)
+    }
+
     setAssignForm({
       classId: '',
-      startDate: defaultStart.toISOString().split('T')[0],
-      startTime: defaultStart.toTimeString().slice(0, 5),
+      startDate: defaultStartDate,
+      startTime: defaultStartTime,
+      endDate: defaultEndDate,
+      endTime: defaultEndTime,
     })
   }
 
@@ -86,16 +109,29 @@ export default function TeacherExams() {
     }
 
     const startDateTime = new Date(`${assignForm.startDate}T${assignForm.startTime}:00`)
-    // Tự động tính thời gian kết thúc = thời gian bắt đầu + duration_minutes
-    const endDateTime = new Date(startDateTime.getTime() + (selectedExam.duration_minutes || 60) * 60 * 1000)
+    const startStr = startDateTime.toISOString()
+
+    let endStr = ''
+    if (assignForm.endDate && assignForm.endTime) {
+      const endDateTime = new Date(`${assignForm.endDate}T${assignForm.endTime}:00`)
+      endStr = endDateTime.toISOString()
+    } else if (assignForm.endDate || assignForm.endTime) {
+      toast.error('Vui lòng điền đủ cả ngày và giờ kết thúc hoặc để trống cả hai')
+      return
+    }
+
+    if (endStr && new Date(endStr) <= startDateTime) {
+      toast.error('Thời gian kết thúc phải diễn ra sau thời gian bắt đầu')
+      return
+    }
 
     setAssigning(true)
     try {
       await examApi.assignExamToClass(
         selectedExam.id,
         assignForm.classId,
-        startDateTime.toISOString(),
-        endDateTime.toISOString()
+        startStr,
+        endStr
       )
       toast.success('Giao bài thi thành công')
       setShowAssignModal(false)
@@ -167,19 +203,18 @@ export default function TeacherExams() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        exam.status === 'published'
+                      className={`px-2 py-1 text-xs rounded-full ${exam.status === 'published'
                           ? 'bg-green-100 text-green-800'
                           : exam.status === 'closed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
                     >
                       {exam.status === 'published'
                         ? 'Đã xuất bản'
                         : exam.status === 'closed'
-                        ? 'Đã đóng'
-                        : 'Nháp'}
+                          ? 'Đã đóng'
+                          : 'Nháp'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
@@ -289,30 +324,29 @@ export default function TeacherExams() {
                 </p>
               </div>
 
-              {/* Thông tin thời gian kết thúc (tự động tính) */}
-              {assignForm.startDate && assignForm.startTime && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="text-sm font-medium text-gray-700 mb-1">
-                    Thời gian kết thúc (tự động tính):
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {(() => {
-                      const startDateTime = new Date(`${assignForm.startDate}T${assignForm.startTime}:00`)
-                      const endDateTime = new Date(startDateTime.getTime() + (selectedExam.duration_minutes || 60) * 60 * 1000)
-                      return endDateTime.toLocaleString('vi-VN', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    })()}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Sau thời gian này, bài thi sẽ tự động đóng và nộp bài cho học sinh chưa nộp
-                  </p>
+              {/* Thời gian kết thúc (Cho phép nhập tay) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Thời gian kết thúc (Mở bài thi vô hạn nếu để trống)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={assignForm.endDate || ''}
+                    onChange={(e) => setAssignForm({ ...assignForm, endDate: e.target.value })}
+                    className="input"
+                  />
+                  <input
+                    type="time"
+                    value={assignForm.endTime || ''}
+                    onChange={(e) => setAssignForm({ ...assignForm, endTime: e.target.value })}
+                    className="input"
+                  />
                 </div>
-              )}
+                <p className="text-xs text-gray-500 mt-1">
+                  Nếu có thời gian, sau lúc này bài thi tự động đóng và nộp
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">

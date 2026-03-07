@@ -29,14 +29,14 @@ export default function StudentExamReview() {
   const checkCanReview = async (examData: any) => {
     try {
       const now = new Date()
-      
+
       // Lấy assignment để có end_time chính xác
       const assignments = await examApi.getAssignedExams(undefined, false)
       const assignment = assignments.find((a: any) => a.exam_id === id)
-      
+
       // Sử dụng end_time từ assignment nếu có, nếu không thì dùng từ exam
       const endTime = assignment?.end_time || examData.end_time
-      
+
       // Kiểm tra 1: Bài thi đã kết thúc chưa?
       if (endTime) {
         const endTimeDate = new Date(endTime)
@@ -64,7 +64,7 @@ export default function StudentExamReview() {
       if (allAttempts && allAttempts.length > 0) {
         // Kiểm tra xem còn attempt nào đang in_progress không
         const inProgressAttempts = allAttempts.filter((a: any) => a.status === 'in_progress')
-        
+
         if (inProgressAttempts.length > 0) {
           setReviewMessage(`Vẫn còn ${inProgressAttempts.length} học sinh chưa nộp bài. Vui lòng đợi tất cả học sinh hoàn thành bài thi.`)
           return false
@@ -87,7 +87,7 @@ export default function StudentExamReview() {
       const examData = await examApi.getExamById(id!)
       const questionsData = await examApi.getQuestions(id!)
       const attempts = await examApi.getAttempts()
-      
+
       const myAttempt = attempts.find(
         (a: any) => a.exam_id === id && a.student_id === profile?.id && (a.status === 'submitted' || a.status === 'timeout')
       )
@@ -100,7 +100,7 @@ export default function StudentExamReview() {
 
       // Kiểm tra điều kiện xem lại
       const canReviewNow = await checkCanReview(examData)
-      
+
       if (!canReviewNow) {
         setExam(examData)
         setAttempt(myAttempt)
@@ -217,7 +217,7 @@ export default function StudentExamReview() {
 
   const isCorrect = (question: any, responses: any[]) => {
     if (!responses || responses.length === 0) return false
-    
+
     if (question.question_type === 'multiple_choice') {
       const response = responses[0]
       return response?.is_correct || false
@@ -285,23 +285,20 @@ export default function StudentExamReview() {
         {questions.map((question, idx) => {
           const questionResponses = getResponsesForQuestion(question.id)
           const correct = isCorrect(question, questionResponses)
-          
+
           return (
             <div
               key={question.id}
-              className={`bg-white rounded-xl shadow-lg border-2 overflow-hidden ${
-                correct ? 'border-green-200' : 'border-red-200'
-              }`}
+              className={`bg-white rounded-xl shadow-lg border-2 overflow-hidden ${correct ? 'border-green-200' : 'border-red-200'
+                }`}
             >
               {/* Question Header */}
-              <div className={`px-6 py-4 ${
-                correct ? 'bg-green-50 border-b-2 border-green-200' : 'bg-red-50 border-b-2 border-red-200'
-              }`}>
+              <div className={`px-6 py-4 ${correct ? 'bg-green-50 border-b-2 border-green-200' : 'bg-red-50 border-b-2 border-red-200'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                      correct ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${correct ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                      }`}>
                       {idx + 1}
                     </div>
                     <div>
@@ -329,14 +326,14 @@ export default function StudentExamReview() {
 
               {/* Question Content */}
               <div className="p-6">
-                <p className="text-lg font-semibold text-gray-900 mb-4">{question.content}</p>
+                <p className="text-lg font-semibold text-gray-900 mb-4 whitespace-pre-wrap">{question.content}</p>
 
                 {/* Image */}
                 {question.image_url && (
                   <div className="mb-6 flex justify-center bg-gray-50 p-4 rounded-lg">
-                    <img 
-                      src={question.image_url} 
-                      alt="Question" 
+                    <img
+                      src={question.image_url}
+                      alt="Question"
                       className="max-w-full max-h-[300px] rounded-lg object-contain"
                     />
                   </div>
@@ -349,26 +346,24 @@ export default function StudentExamReview() {
                       const studentResponse = questionResponses[0]
                       const isSelected = studentResponse?.answer_id === answer.id
                       const isCorrectAnswer = answer.is_correct
-                      
+
                       return (
                         <div
                           key={answer.id}
-                          className={`p-4 rounded-lg border-2 ${
-                            isCorrectAnswer
+                          className={`p-4 rounded-lg border-2 ${isCorrectAnswer
                               ? 'bg-green-50 border-green-500'
                               : isSelected
-                              ? 'bg-red-50 border-red-500'
-                              : 'bg-gray-50 border-gray-200'
-                          }`}
+                                ? 'bg-red-50 border-red-500'
+                                : 'bg-gray-50 border-gray-200'
+                            }`}
                         >
                           <div className="flex items-center space-x-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                              isCorrectAnswer
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${isCorrectAnswer
                                 ? 'bg-green-500 text-white'
                                 : isSelected
-                                ? 'bg-red-500 text-white'
-                                : 'bg-gray-300 text-gray-600'
-                            }`}>
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}>
                               {String.fromCharCode(65 + aidx)}
                             </div>
                             <span className="flex-1 text-gray-900">{answer.content}</span>
@@ -402,17 +397,16 @@ export default function StudentExamReview() {
                       const studentAnswer = getStudentAnswerForTF(question.id, answer.id)
                       const correctAnswer = answer.is_correct === true
                       const isCorrect = studentAnswer === correctAnswer
-                      
+
                       return (
                         <div
                           key={answer.id}
-                          className={`p-4 rounded-lg border-2 ${
-                            isCorrect && studentAnswer !== null
+                          className={`p-4 rounded-lg border-2 ${isCorrect && studentAnswer !== null
                               ? 'bg-green-50 border-green-500'
                               : studentAnswer !== null
-                              ? 'bg-red-50 border-red-500'
-                              : 'bg-gray-50 border-gray-200'
-                          }`}
+                                ? 'bg-red-50 border-red-500'
+                                : 'bg-gray-50 border-gray-200'
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 flex-1">
@@ -423,20 +417,18 @@ export default function StudentExamReview() {
                             </div>
                             <div className="flex items-center space-x-3 ml-4">
                               {/* Đáp án đúng */}
-                              <div className={`px-3 py-1 rounded-lg font-semibold ${
-                                correctAnswer
+                              <div className={`px-3 py-1 rounded-lg font-semibold ${correctAnswer
                                   ? 'bg-green-500 text-white'
                                   : 'bg-red-500 text-white'
-                              }`}>
+                                }`}>
                                 {correctAnswer ? 'Đúng' : 'Sai'}
                               </div>
                               {/* Đáp án bạn chọn */}
                               {studentAnswer !== null && (
-                                <div className={`px-3 py-1 rounded-lg font-semibold border-2 ${
-                                  studentAnswer
+                                <div className={`px-3 py-1 rounded-lg font-semibold border-2 ${studentAnswer
                                     ? 'bg-green-100 text-green-700 border-green-500'
                                     : 'bg-red-100 text-red-700 border-red-500'
-                                }`}>
+                                  }`}>
                                   {studentAnswer ? 'Đúng' : 'Sai'}
                                 </div>
                               )}
@@ -475,9 +467,8 @@ export default function StudentExamReview() {
                       <p className="text-2xl font-bold text-blue-700">{question.correct_answer || '-'}</p>
                     </div>
                     {questionResponses[0]?.text_answer && (
-                      <div className={`border-2 rounded-lg p-4 ${
-                        correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                      }`}>
+                      <div className={`border-2 rounded-lg p-4 ${correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                        }`}>
                         <p className="text-sm font-medium text-gray-700 mb-2">Đáp án của bạn:</p>
                         <p className={`text-2xl font-bold ${correct ? 'text-green-700' : 'text-red-700'}`}>
                           {questionResponses[0].text_answer}

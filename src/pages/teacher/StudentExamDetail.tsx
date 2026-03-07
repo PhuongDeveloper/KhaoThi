@@ -11,11 +11,11 @@ export default function StudentExamDetail() {
   const { id, attemptId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   // Detect context: admin or teacher
   const isAdmin = location.pathname.startsWith('/admin')
   const basePath = isAdmin ? '/admin' : '/teacher'
-  
+
   const [exam, setExam] = useState<any>(null)
   const [questions, setQuestions] = useState<any[]>([])
   const [attempt, setAttempt] = useState<any>(null)
@@ -79,7 +79,7 @@ export default function StudentExamDetail() {
 
   const isCorrect = (question: any, responses: any[]) => {
     if (!responses || responses.length === 0) return false
-    
+
     if (question.question_type === 'multiple_choice') {
       const response = responses[0]
       const correctAnswer = question.answers?.find((a: any) => a.is_correct)
@@ -156,23 +156,20 @@ export default function StudentExamDetail() {
         {questions.map((question, idx) => {
           const questionResponses = getResponsesForQuestion(question.id)
           const correct = isCorrect(question, questionResponses)
-          
+
           return (
             <div
               key={question.id}
-              className={`bg-white rounded-xl shadow-lg border-2 overflow-hidden ${
-                correct ? 'border-green-300' : 'border-red-300'
-              }`}
+              className={`bg-white rounded-xl shadow-lg border-2 overflow-hidden ${correct ? 'border-green-300' : 'border-red-300'
+                }`}
             >
               {/* Question Header */}
-              <div className={`px-6 py-4 ${
-                correct ? 'bg-green-50 border-b-2 border-green-300' : 'bg-red-50 border-b-2 border-red-300'
-              }`}>
+              <div className={`px-6 py-4 ${correct ? 'bg-green-50 border-b-2 border-green-300' : 'bg-red-50 border-b-2 border-red-300'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                      correct ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                    }`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${correct ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                      }`}>
                       {idx + 1}
                     </div>
                     <div>
@@ -200,14 +197,14 @@ export default function StudentExamDetail() {
 
               {/* Question Content */}
               <div className="p-6">
-                <p className="text-lg font-semibold text-gray-900 mb-4">{question.content}</p>
+                <p className="text-lg font-semibold text-gray-900 mb-4 whitespace-pre-wrap">{question.content}</p>
 
                 {/* Image */}
                 {question.image_url && (
                   <div className="mb-6 flex justify-center bg-gray-50 p-4 rounded-lg">
-                    <img 
-                      src={question.image_url} 
-                      alt="Question" 
+                    <img
+                      src={question.image_url}
+                      alt="Question"
                       className="max-w-full max-h-[300px] rounded-lg object-contain"
                     />
                   </div>
@@ -220,26 +217,24 @@ export default function StudentExamDetail() {
                       const studentResponse = questionResponses[0]
                       const isSelected = studentResponse?.answer_id === answer.id
                       const isCorrectAnswer = answer.is_correct
-                      
+
                       return (
                         <div
                           key={answer.id}
-                          className={`p-4 rounded-lg border-2 ${
-                            isCorrectAnswer
+                          className={`p-4 rounded-lg border-2 ${isCorrectAnswer
                               ? 'bg-green-50 border-green-500'
                               : isSelected
-                              ? 'bg-red-50 border-red-500'
-                              : 'bg-gray-50 border-gray-200'
-                          }`}
+                                ? 'bg-red-50 border-red-500'
+                                : 'bg-gray-50 border-gray-200'
+                            }`}
                         >
                           <div className="flex items-center space-x-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                              isCorrectAnswer
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${isCorrectAnswer
                                 ? 'bg-green-500 text-white'
                                 : isSelected
-                                ? 'bg-red-500 text-white'
-                                : 'bg-gray-300 text-gray-600'
-                            }`}>
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}>
                               {String.fromCharCode(65 + aidx)}
                             </div>
                             <span className="flex-1 text-gray-900">{answer.content}</span>
@@ -279,17 +274,16 @@ export default function StudentExamDetail() {
                       const studentAnswer = getStudentAnswerForTF(question.id, answer.id)
                       const correctAnswer = answer.is_correct === true
                       const isCorrect = studentAnswer === correctAnswer
-                      
+
                       return (
                         <div
                           key={answer.id}
-                          className={`p-4 rounded-lg border-2 ${
-                            isCorrect && studentAnswer !== null
+                          className={`p-4 rounded-lg border-2 ${isCorrect && studentAnswer !== null
                               ? 'bg-green-50 border-green-500'
                               : studentAnswer !== null
-                              ? 'bg-red-50 border-red-500'
-                              : 'bg-gray-50 border-gray-200'
-                          }`}
+                                ? 'bg-red-50 border-red-500'
+                                : 'bg-gray-50 border-gray-200'
+                            }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 flex-1">
@@ -300,20 +294,18 @@ export default function StudentExamDetail() {
                             </div>
                             <div className="flex items-center space-x-3 ml-4">
                               {/* Đáp án đúng */}
-                              <div className={`px-3 py-1 rounded-lg font-semibold ${
-                                correctAnswer
+                              <div className={`px-3 py-1 rounded-lg font-semibold ${correctAnswer
                                   ? 'bg-green-500 text-white'
                                   : 'bg-red-500 text-white'
-                              }`}>
+                                }`}>
                                 {correctAnswer ? 'Đúng' : 'Sai'}
                               </div>
                               {/* Đáp án học sinh chọn */}
                               {studentAnswer !== null && (
-                                <div className={`px-3 py-1 rounded-lg font-semibold border-2 ${
-                                  studentAnswer
+                                <div className={`px-3 py-1 rounded-lg font-semibold border-2 ${studentAnswer
                                     ? 'bg-green-100 text-green-700 border-green-500'
                                     : 'bg-red-100 text-red-700 border-red-500'
-                                }`}>
+                                  }`}>
                                   {studentAnswer ? 'Đúng' : 'Sai'}
                                 </div>
                               )}
@@ -352,9 +344,8 @@ export default function StudentExamDetail() {
                       <p className="text-2xl font-bold text-green-700">{question.correct_answer || '-'}</p>
                     </div>
                     {questionResponses[0]?.text_answer && (
-                      <div className={`border-2 rounded-lg p-4 ${
-                        correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                      }`}>
+                      <div className={`border-2 rounded-lg p-4 ${correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                        }`}>
                         <p className="text-sm font-medium text-gray-700 mb-2">Đáp án học sinh:</p>
                         <p className={`text-2xl font-bold ${correct ? 'text-green-700' : 'text-red-700'}`}>
                           {questionResponses[0].text_answer}

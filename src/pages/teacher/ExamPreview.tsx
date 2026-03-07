@@ -9,11 +9,11 @@ export default function ExamPreview() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   // Detect context: admin or teacher
   const isAdmin = location.pathname.startsWith('/admin')
   const basePath = isAdmin ? '/admin' : '/teacher'
-  
+
   const [exam, setExam] = useState<any>(null)
   const [questions, setQuestions] = useState<any[]>([])
   const [attempt, setAttempt] = useState<any>(null)
@@ -166,7 +166,7 @@ export default function ExamPreview() {
   const handleShortAnswerChange = async (questionId: string, answerArray: string[]) => {
     setShortAnswers({ ...shortAnswers, [questionId]: answerArray })
     const textAnswer = answerArray.join('')
-    
+
     if (attempt && textAnswer) {
       try {
         await examApi.submitResponse(attempt.id, questionId, null, textAnswer)
@@ -184,11 +184,11 @@ export default function ExamPreview() {
       if (attempt) {
         const timeSpent = startTime ? Math.floor((new Date().getTime() - startTime.getTime()) / 1000) : 0
         await examApi.submitExam(attempt.id, timeSpent, [])
-        
+
         // Tính điểm
         let totalScore = 0
         let maxScore = 0
-        
+
         questions.forEach((q) => {
           if (q.question_type === 'multiple_choice') {
             maxScore += exam.multiple_choice_score || 0
@@ -215,7 +215,7 @@ export default function ExamPreview() {
             }
           }
         })
-        
+
         const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
         setScore(percentage)
         setSubmitted(true)
@@ -239,7 +239,7 @@ export default function ExamPreview() {
       return shortAnswers[questionId]?.some(v => v) ? 'answered' : 'unanswered'
     }
     if (questionType === 'true_false_multi') {
-      const hasAnswer = questions.find(q => q.id === questionId)?.answers?.some((a: any) => 
+      const hasAnswer = questions.find(q => q.id === questionId)?.answers?.some((a: any) =>
         selectedAnswers[`${questionId}-${a.id}`]
       )
       return hasAnswer ? 'answered' : 'unanswered'
@@ -251,7 +251,7 @@ export default function ExamPreview() {
     if (!submitted) return null
     const question = questions.find(q => q.id === questionId)
     if (!question) return null
-    
+
     if (question.question_type === 'multiple_choice') {
       return selectedAnswers[questionId] === correctAnswers[questionId]
     } else if (question.question_type === 'true_false_multi' && answerId) {
@@ -299,14 +299,13 @@ export default function ExamPreview() {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               {!submitted && (
-                <div className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-mono font-bold ${
-                  timeRemaining < 300 ? 'bg-red-100 text-red-700 border border-red-300' : 
-                  timeRemaining < 600 ? 'bg-orange-100 text-orange-700 border border-orange-300' :
-                  'bg-green-100 text-green-700 border border-green-300'
-                }`}>
+                <div className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-mono font-bold ${timeRemaining < 300 ? 'bg-red-100 text-red-700 border border-red-300' :
+                    timeRemaining < 600 ? 'bg-orange-100 text-orange-700 border border-orange-300' :
+                      'bg-green-100 text-green-700 border border-green-300'
+                  }`}>
                   <Clock className="h-5 w-5" />
                   <span className="text-lg">{formatTime(timeRemaining)}</span>
                 </div>
@@ -320,7 +319,7 @@ export default function ExamPreview() {
               </button>
             </div>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="mt-3">
             <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
@@ -340,13 +339,12 @@ export default function ExamPreview() {
             {currentQuestion && (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
                 {/* Question Header */}
-                <div className={`px-6 py-4 ${
-                  submitted && isAnswerCorrect(currentQuestion.id) === false
+                <div className={`px-6 py-4 ${submitted && isAnswerCorrect(currentQuestion.id) === false
                     ? 'bg-red-500'
                     : submitted && isAnswerCorrect(currentQuestion.id) === true
-                    ? 'bg-green-500'
-                    : 'bg-gradient-to-r from-blue-500 to-blue-600'
-                }`}>
+                      ? 'bg-green-500'
+                      : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                  }`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1.5">
@@ -361,13 +359,12 @@ export default function ExamPreview() {
                       </span>
                     </div>
                     {submitted && (
-                      <div className={`rounded-full p-1.5 ${
-                        isAnswerCorrect(currentQuestion.id) === true
+                      <div className={`rounded-full p-1.5 ${isAnswerCorrect(currentQuestion.id) === true
                           ? 'bg-green-600'
                           : isAnswerCorrect(currentQuestion.id) === false
-                          ? 'bg-red-600'
-                          : 'bg-gray-400'
-                      }`}>
+                            ? 'bg-red-600'
+                            : 'bg-gray-400'
+                        }`}>
                         <CheckCircle className="h-4 w-4 text-white" />
                       </div>
                     )}
@@ -381,16 +378,16 @@ export default function ExamPreview() {
 
                 {/* Question Content */}
                 <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed whitespace-pre-wrap">
                     {currentQuestion.content}
                   </h2>
 
                   {/* Image */}
                   {currentQuestion.image_url && (
                     <div className="mb-6 flex justify-center bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
-                      <img 
-                        src={currentQuestion.image_url} 
-                        alt="Question" 
+                      <img
+                        src={currentQuestion.image_url}
+                        alt="Question"
                         className="max-w-full max-h-[400px] rounded-lg shadow-md object-contain"
                       />
                     </div>
@@ -403,29 +400,27 @@ export default function ExamPreview() {
                         const isSelected = selectedAnswers[currentQuestion.id] === answer.id
                         const isCorrect = answer.is_correct
                         const showResult = submitted
-                        
+
                         return (
                           <label
                             key={answer.id}
-                            className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                              showResult && isCorrect
+                            className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-all ${showResult && isCorrect
                                 ? 'border-green-500 bg-green-50 shadow-md'
                                 : showResult && isSelected && !isCorrect
-                                ? 'border-red-500 bg-red-50 shadow-md'
-                                : isSelected
-                                ? 'border-blue-500 bg-blue-50 shadow-md'
-                                : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
-                            }`}
+                                  ? 'border-red-500 bg-red-50 shadow-md'
+                                  : isSelected
+                                    ? 'border-blue-500 bg-blue-50 shadow-md'
+                                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                              }`}
                           >
-                            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mr-4 mt-0.5 ${
-                              showResult && isCorrect
+                            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center mr-4 mt-0.5 ${showResult && isCorrect
                                 ? 'bg-green-600 text-white'
                                 : showResult && isSelected && !isCorrect
-                                ? 'bg-red-600 text-white'
-                                : isSelected
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-200 text-gray-600'
-                            }`}>
+                                  ? 'bg-red-600 text-white'
+                                  : isSelected
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-200 text-gray-600'
+                              }`}>
                               {String.fromCharCode(65 + idx)}
                             </div>
                             <input
@@ -454,17 +449,16 @@ export default function ExamPreview() {
                         const selected = selectedAnswers[`${currentQuestion.id}-${answer.id}`]
                         const correct = answer.is_correct ? 'true' : 'false'
                         const showResult = submitted
-                        
+
                         return (
                           <div
                             key={answer.id}
-                            className={`border-2 rounded-xl p-4 transition-colors ${
-                              showResult && selected === correct
+                            className={`border-2 rounded-xl p-4 transition-colors ${showResult && selected === correct
                                 ? 'border-green-500 bg-green-50'
                                 : showResult && selected && selected !== correct
-                                ? 'border-red-500 bg-red-50'
-                                : 'border-gray-200 hover:border-blue-300'
-                            }`}
+                                  ? 'border-red-500 bg-red-50'
+                                  : 'border-gray-200 hover:border-blue-300'
+                              }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-start flex-1">
@@ -474,15 +468,14 @@ export default function ExamPreview() {
                                 <span className="text-gray-900 flex-1 leading-relaxed">{answer.content}</span>
                               </div>
                               <div className="flex items-center space-x-3 ml-4">
-                                <label className={`flex items-center cursor-pointer px-4 py-2 rounded-lg transition-all ${
-                                  selected === 'true'
+                                <label className={`flex items-center cursor-pointer px-4 py-2 rounded-lg transition-all ${selected === 'true'
                                     ? showResult && correct === 'true'
                                       ? 'bg-green-500 border-2 border-green-600 text-white'
                                       : showResult && correct !== 'true'
-                                      ? 'bg-red-500 border-2 border-red-600 text-white'
-                                      : 'bg-green-100 border-2 border-green-500'
+                                        ? 'bg-red-500 border-2 border-red-600 text-white'
+                                        : 'bg-green-100 border-2 border-green-500'
                                     : 'bg-gray-50 border-2 border-gray-200 hover:border-green-300'
-                                }`}>
+                                  }`}>
                                   <input
                                     type="radio"
                                     name={`tf-${currentQuestion.id}-${answer.id}`}
@@ -497,15 +490,14 @@ export default function ExamPreview() {
                                     Đúng
                                   </span>
                                 </label>
-                                <label className={`flex items-center cursor-pointer px-4 py-2 rounded-lg transition-all ${
-                                  selected === 'false'
+                                <label className={`flex items-center cursor-pointer px-4 py-2 rounded-lg transition-all ${selected === 'false'
                                     ? showResult && correct === 'false'
                                       ? 'bg-green-500 border-2 border-green-600 text-white'
                                       : showResult && correct !== 'false'
-                                      ? 'bg-red-500 border-2 border-red-600 text-white'
-                                      : 'bg-red-100 border-2 border-red-500'
+                                        ? 'bg-red-500 border-2 border-red-600 text-white'
+                                        : 'bg-red-100 border-2 border-red-500'
                                     : 'bg-gray-50 border-2 border-gray-200 hover:border-red-300'
-                                }`}>
+                                  }`}>
                                   <input
                                     type="radio"
                                     name={`tf-${currentQuestion.id}-${answer.id}`}
@@ -625,22 +617,21 @@ export default function ExamPreview() {
                     const status = getQuestionStatus(q.id, q.question_type)
                     const isCurrent = idx === currentQuestionIndex
                     const isCorrect = submitted ? isAnswerCorrect(q.id) : null
-                    
+
                     return (
                       <button
                         key={q.id}
                         onClick={() => setCurrentQuestionIndex(idx)}
-                        className={`aspect-square rounded-lg font-semibold text-sm transition-all ${
-                          isCurrent
+                        className={`aspect-square rounded-lg font-semibold text-sm transition-all ${isCurrent
                             ? 'bg-blue-600 text-white shadow-lg scale-110 ring-4 ring-blue-200'
                             : submitted && isCorrect === true
-                            ? 'bg-green-100 text-green-700 border-2 border-green-300'
-                            : submitted && isCorrect === false
-                            ? 'bg-red-100 text-red-700 border-2 border-red-300'
-                            : status === 'answered'
-                            ? 'bg-blue-100 text-blue-700 border-2 border-blue-300 hover:bg-blue-200'
-                            : 'bg-gray-100 text-gray-600 border-2 border-gray-300 hover:bg-gray-200'
-                        }`}
+                              ? 'bg-green-100 text-green-700 border-2 border-green-300'
+                              : submitted && isCorrect === false
+                                ? 'bg-red-100 text-red-700 border-2 border-red-300'
+                                : status === 'answered'
+                                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300 hover:bg-blue-200'
+                                  : 'bg-gray-100 text-gray-600 border-2 border-gray-300 hover:bg-gray-200'
+                          }`}
                       >
                         {idx + 1}
                       </button>

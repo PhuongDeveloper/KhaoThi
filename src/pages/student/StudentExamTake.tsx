@@ -414,7 +414,7 @@ export default function StudentExamTake() {
 
         {/* Question Content */}
         <div className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed">{question.content}</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed whitespace-pre-wrap">{question.content}</h2>
           {question.image_url && (
             <div className="mb-6 flex justify-center bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
               <img src={question.image_url} alt="Question" className="max-w-full max-h-[400px] rounded-lg shadow-md object-contain" />

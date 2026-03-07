@@ -95,10 +95,9 @@ export default function TeacherExamEdit() {
         end_time: formData.end_time || null,
       })
       if (formData.status === 'published' && selectedClassId) {
-        const now = new Date()
-        const start = new Date(now.getTime() + 5 * 60 * 1000)
-        const end = new Date(start.getTime() + formData.duration_minutes * 60 * 1000)
-        await examApi.assignExamToClass(id!, selectedClassId, start.toISOString(), end.toISOString())
+        const startStr = formData.start_time ? new Date(formData.start_time).toISOString() : new Date(Date.now() + 5 * 60000).toISOString();
+        const endStr = formData.end_time ? new Date(formData.end_time).toISOString() : '';
+        await examApi.assignExamToClass(id!, selectedClassId, startStr, endStr)
         toast.success('Cập nhật và giao bài thi thành công')
       } else {
         toast.success('Cập nhật bài thi thành công')
@@ -115,10 +114,9 @@ export default function TeacherExamEdit() {
     if (!selectedClassId) { toast.error('Vui lòng chọn lớp'); return }
     setAssigning(true)
     try {
-      const now = new Date()
-      const start = new Date(now.getTime() + 5 * 60 * 1000)
-      const end = new Date(start.getTime() + formData.duration_minutes * 60 * 1000)
-      await examApi.assignExamToClass(id!, selectedClassId, start.toISOString(), end.toISOString())
+      const startStr = formData.start_time ? new Date(formData.start_time).toISOString() : new Date(Date.now() + 5 * 60000).toISOString();
+      const endStr = formData.end_time ? new Date(formData.end_time).toISOString() : '';
+      await examApi.assignExamToClass(id!, selectedClassId, startStr, endStr)
       toast.success('Giao bài thi cho lớp thành công')
       setSelectedClassId('')
     } catch (error: any) {
@@ -352,7 +350,7 @@ export default function TeacherExamEdit() {
                   {assigning ? 'Đang giao bài...' : 'Giao bài ngay'}
                 </button>
                 <p className="text-xs text-primary-700 bg-primary-100 border border-primary-200 rounded-lg px-3 py-2">
-                  ℹ️ Học sinh có thể làm bài sau 5 phút. Thời gian kết thúc dựa theo thời gian làm bài.
+                  ℹ️ Thời gian lớp vào làm bài sẽ lấy theo phần Cài Đặt thời gian. Nếu bỏ trống, thời gian kết thúc sẽ không giới hạn.
                 </p>
               </div>
             </div>

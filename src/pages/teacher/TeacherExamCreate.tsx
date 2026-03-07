@@ -724,15 +724,15 @@ export default function TeacherExamCreate() {
                       </div>
 
                       {/* Nội dung câu hỏi */}
-                      <input
-                        type="text"
+                      <textarea
+                        rows={3}
                         value={q.content}
                         onChange={(e) => {
                           const newQs = [...manualQuestions]
                           newQs[originalIdx].content = e.target.value
                           setManualQuestions(newQs)
                         }}
-                        className="input mb-2"
+                        className="input mb-2 whitespace-pre-wrap"
                         placeholder="Nội dung câu hỏi"
                       />
 
@@ -867,15 +867,15 @@ export default function TeacherExamCreate() {
                       </div>
 
                       {/* Nội dung câu hỏi */}
-                      <input
-                        type="text"
+                      <textarea
+                        rows={3}
                         value={q.content}
                         onChange={(e) => {
                           const newQs = [...manualQuestions]
                           newQs[originalIdx].content = e.target.value
                           setManualQuestions(newQs)
                         }}
-                        className="input mb-2"
+                        className="input mb-2 whitespace-pre-wrap"
                         placeholder="Nội dung câu hỏi"
                       />
 
@@ -1009,15 +1009,15 @@ export default function TeacherExamCreate() {
                       </div>
 
                       {/* Nội dung câu hỏi */}
-                      <input
-                        type="text"
+                      <textarea
+                        rows={3}
                         value={q.content}
                         onChange={(e) => {
                           const newQs = [...manualQuestions]
                           newQs[originalIdx].content = e.target.value
                           setManualQuestions(newQs)
                         }}
-                        className="input mb-2"
+                        className="input mb-2 whitespace-pre-wrap"
                         placeholder="Nội dung câu hỏi"
                       />
 
