@@ -81,8 +81,14 @@ export const userApi = {
     return this.getById(id)
   },
 
-  async bulkCreateStudents(students: { full_name: string, base_email: string }[], commonPassword: string) {
+  async bulkCreateStudents(
+    students: { full_name: string, base_email: string }[],
+    commonPassword: string,
+    onProgress?: (current: number, total: number, studentName: string) => void
+  ) {
     const results: any[] = []
+    const total = students.length;
+    let currentProcessed = 0;
 
     // Tạo Secondary App để không làm logout admin hiện tại
     const secondaryAppName = `SecondaryApp_${Date.now()}`
@@ -91,11 +97,18 @@ export const userApi = {
 
     try {
       for (const student of students) {
+        currentProcessed++;
+        if (onProgress) {
+          onProgress(currentProcessed, total, student.full_name);
+        }
+
         let currentEmail = student.base_email
         let counter = 1
         let userCredential = null
+        let retries = 0;
+        const MAX_RETRIES = 3;
 
-        while (!userCredential) {
+        while (!userCredential && retries < MAX_RETRIES) {
           try {
             userCredential = await createUserWithEmailAndPassword(secondaryAuth, currentEmail, commonPassword)
           } catch (error: any) {
@@ -104,38 +117,56 @@ export const userApi = {
               const emailParts = student.base_email.split('@')
               currentEmail = `${emailParts[0]}${counter}@${emailParts[1]}`
               counter++
+            } else if (
+              error.code === 'auth/too-many-requests' ||
+              error.code === 'auth/network-request-failed' ||
+              error.message?.includes('400')
+            ) {
+              retries++;
+              if (retries >= MAX_RETRIES) {
+                console.error(`Firebase error for ${student.full_name} sau ${MAX_RETRIES} lần thử:`, error);
+                throw new Error(`Lỗi Firebase khi tạo tài khoản ${student.full_name} (${error.code || error.message}). Vui lòng thử lại sau vài phút.`);
+              }
+              // Backoff delay: 3s, 6s
+              await delay(3000 * retries);
+            } else if (error.code === 'auth/invalid-email') {
+              // Nếu email lỗi cú pháp, thử random để ko bị văng
+              currentEmail = `student_${Date.now()}_${counter}@gmail.com`;
+              counter++;
             } else {
               throw error // Lỗi khác thì ném ra
             }
           }
         }
 
-        const user = userCredential.user
-        const now = Timestamp.fromDate(new Date())
+        if (userCredential) {
+          const user = userCredential.user
+          const now = Timestamp.fromDate(new Date())
 
-        const profileData = {
-          id: user.uid,
-          email: currentEmail,
-          full_name: student.full_name,
-          role: 'student',
-          student_code: null,
-          teacher_code: null,
-          class_id: null,
-          created_at: now,
-          updated_at: now,
+          const profileData = {
+            id: user.uid,
+            email: currentEmail,
+            full_name: student.full_name,
+            role: 'student',
+            student_code: null,
+            teacher_code: null,
+            class_id: null,
+            created_at: now,
+            updated_at: now,
+          }
+
+          await setDoc(doc(db, 'profiles', user.uid), profileData)
+
+          results.push({
+            id: user.uid,
+            full_name: student.full_name,
+            email: currentEmail,
+            password: commonPassword
+          })
+
+          // NGHỈ 1500ms ĐỂ TRÁNH LỖI MẠNG VÀ SPAM FIREBASE AUTH (QUOTA THƯỜNG RẤT GẮT)
+          await delay(1500)
         }
-
-        await setDoc(doc(db, 'profiles', user.uid), profileData)
-
-        results.push({
-          id: user.uid,
-          full_name: student.full_name,
-          email: currentEmail,
-          password: commonPassword
-        })
-
-        // NGHỈ 600ms ĐỂ TRÁNH LỖI MẠNG (QUIC_PROTOCOL_ERROR / Spamming)
-        await delay(600)
       }
     } finally {
       // Xóa app sau khi hoàn thành

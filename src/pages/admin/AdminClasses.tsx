@@ -35,9 +35,14 @@ function removeVietnameseTones(str: string) {
 }
 
 function generateBaseEmail(fullName: string) {
-  const cleanName = removeVietnameseTones(fullName).toLowerCase();
+  // Bỏ dấu, chuyển chữ thường, thay khoảng trắng thành dấu cách đơn
+  let cleanName = removeVietnameseTones(fullName).toLowerCase().replace(/\s+/g, ' ');
+  // Chỉ giữ lại ký tự a-z, 0-9 và dấu cách (giúp loại bỏ dấu phẩy, nháy, vân vân gây lỗi email)
+  cleanName = cleanName.replace(/[^a-z0-9 ]/g, '');
+
   const parts = cleanName.split(' ').filter(Boolean);
-  if (parts.length === 0) return 'student@gmail.com';
+  if (parts.length === 0) return `student${Date.now().toString().slice(-4)}@gmail.com`;
+
   const lastName = parts.pop();
   const initials = parts.map(p => p[0]).join('');
   return `${lastName}${initials}@gmail.com`;
@@ -145,9 +150,15 @@ export default function AdminClasses() {
             }
 
             if (studentsToCreate.length > 0) {
-              toast.loading(`Đang tạo ${studentsToCreate.length} tài khoản học sinh...`, { id: 'bulk-create' });
+              toast.loading(`Đang khởi tạo ${studentsToCreate.length} tài khoản (0/${studentsToCreate.length})...`, { id: 'bulk-create' });
               try {
-                const createdAccounts = await userApi.bulkCreateStudents(studentsToCreate, commonPassword);
+                const createdAccounts = await userApi.bulkCreateStudents(
+                  studentsToCreate,
+                  commonPassword,
+                  (current, total, name) => {
+                    toast.loading(`Đang tạo ${current}/${total}: ${name}`, { id: 'bulk-create' });
+                  }
+                );
                 for (const acc of createdAccounts) {
                   await addStudentToClass(newClass.id, acc.id);
                 }
