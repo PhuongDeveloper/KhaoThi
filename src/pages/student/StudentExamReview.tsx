@@ -30,9 +30,15 @@ export default function StudentExamReview() {
     try {
       const now = new Date()
 
-      // Lấy assignment để có end_time chính xác
+      // Lấy assignment để có end_time chính xác và cờ show_answers
       const assignments = await examApi.getAssignedExams(undefined, false)
       const assignment = assignments.find((a: any) => a.exam_id === id)
+
+      // Nếu giáo viên cho phép xem đáp án ngay sau khi nộp
+      if (assignment?.show_answers === true) {
+        setCanReview(true)
+        return true
+      }
 
       // Sử dụng end_time từ assignment nếu có, nếu không thì dùng từ exam
       const endTime = assignment?.end_time || examData.end_time
@@ -351,18 +357,18 @@ export default function StudentExamReview() {
                         <div
                           key={answer.id}
                           className={`p-4 rounded-lg border-2 ${isCorrectAnswer
-                              ? 'bg-green-50 border-green-500'
-                              : isSelected
-                                ? 'bg-red-50 border-red-500'
-                                : 'bg-gray-50 border-gray-200'
+                            ? 'bg-green-50 border-green-500'
+                            : isSelected
+                              ? 'bg-red-50 border-red-500'
+                              : 'bg-gray-50 border-gray-200'
                             }`}
                         >
                           <div className="flex items-center space-x-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${isCorrectAnswer
-                                ? 'bg-green-500 text-white'
-                                : isSelected
-                                  ? 'bg-red-500 text-white'
-                                  : 'bg-gray-300 text-gray-600'
+                              ? 'bg-green-500 text-white'
+                              : isSelected
+                                ? 'bg-red-500 text-white'
+                                : 'bg-gray-300 text-gray-600'
                               }`}>
                               {String.fromCharCode(65 + aidx)}
                             </div>
@@ -402,10 +408,10 @@ export default function StudentExamReview() {
                         <div
                           key={answer.id}
                           className={`p-4 rounded-lg border-2 ${isCorrect && studentAnswer !== null
-                              ? 'bg-green-50 border-green-500'
-                              : studentAnswer !== null
-                                ? 'bg-red-50 border-red-500'
-                                : 'bg-gray-50 border-gray-200'
+                            ? 'bg-green-50 border-green-500'
+                            : studentAnswer !== null
+                              ? 'bg-red-50 border-red-500'
+                              : 'bg-gray-50 border-gray-200'
                             }`}
                         >
                           <div className="flex items-center justify-between">
@@ -418,16 +424,16 @@ export default function StudentExamReview() {
                             <div className="flex items-center space-x-3 ml-4">
                               {/* Đáp án đúng */}
                               <div className={`px-3 py-1 rounded-lg font-semibold ${correctAnswer
-                                  ? 'bg-green-500 text-white'
-                                  : 'bg-red-500 text-white'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-red-500 text-white'
                                 }`}>
                                 {correctAnswer ? 'Đúng' : 'Sai'}
                               </div>
                               {/* Đáp án bạn chọn */}
                               {studentAnswer !== null && (
                                 <div className={`px-3 py-1 rounded-lg font-semibold border-2 ${studentAnswer
-                                    ? 'bg-green-100 text-green-700 border-green-500'
-                                    : 'bg-red-100 text-red-700 border-red-500'
+                                  ? 'bg-green-100 text-green-700 border-green-500'
+                                  : 'bg-red-100 text-red-700 border-red-500'
                                   }`}>
                                   {studentAnswer ? 'Đúng' : 'Sai'}
                                 </div>

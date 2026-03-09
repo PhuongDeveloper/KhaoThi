@@ -24,6 +24,7 @@ export default function AdminExams() {
     startTime: '',
     endDate: '',
     endTime: '',
+    showAnswers: false,
   })
 
   // Tự động nộp bài khi hết giờ (kiểm tra mỗi phút)
@@ -100,6 +101,7 @@ export default function AdminExams() {
       startTime: defaultStartTime,
       endDate: defaultEndDate,
       endTime: defaultEndTime,
+      showAnswers: false,
     })
   }
 
@@ -136,7 +138,8 @@ export default function AdminExams() {
         selectedExam.id,
         assignForm.classId,
         startStr,
-        endStr
+        endStr,
+        assignForm.showAnswers
       )
       toast.success('Giao bài thi thành công')
       setShowAssignModal(false)
@@ -389,6 +392,27 @@ export default function AdminExams() {
                 <p className="text-xs text-gray-500 mt-1">
                   Nếu có thời gian, sau lúc này bài thi tự động đóng và nộp
                 </p>
+              </div>
+
+              {/* Cho phép xem đáp án ngay */}
+              <div className="flex items-start bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <div className="flex items-center h-5">
+                  <input
+                    id="showAnswersAdmin"
+                    type="checkbox"
+                    checked={assignForm.showAnswers}
+                    onChange={(e) => setAssignForm({ ...assignForm, showAnswers: e.target.checked })}
+                    className="w-4 h-4 text-primary-600 bg-white border-gray-300 rounded focus:ring-primary-500"
+                  />
+                </div>
+                <div className="ml-3 text-sm">
+                  <label htmlFor="showAnswersAdmin" className="font-medium text-gray-900 cursor-pointer">
+                    Cho phép xem đáp án ngay sau khi nộp
+                  </label>
+                  <p className="text-gray-500 mt-0.5">
+                    Học sinh có thể xem ngay kết quả đúng/sai mà không cần đợi đề thi kết thúc hoặc lớp nộp hết.
+                  </p>
+                </div>
               </div>
             </div>
 

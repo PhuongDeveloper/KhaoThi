@@ -320,7 +320,7 @@ export const examApi = {
   },
 
   // Giao bài cho lớp (tự động giao cho tất cả học sinh trong lớp)
-  async assignExamToClass(examId: string, classId: string, startTime: string, endTime: string) {
+  async assignExamToClass(examId: string, classId: string, startTime: string, endTime: string, showAnswers: boolean = false) {
     const examRef = doc(db, 'exams', examId)
     const examSnap = await getDoc(examRef)
     if (!examSnap.exists()) throw new Error('Exam not found')
@@ -366,6 +366,7 @@ export const examApi = {
         class_id: classId,
         start_time: startTime,
         end_time: endTime,
+        show_answers: showAnswers,
         assigned_at: now,
       })
       const snap = await getDoc(ref)
@@ -498,14 +499,18 @@ export const examApi = {
       await Promise.allSettled(promises)
     }
 
-    const timesMap: Record<string, { start_time?: string; end_time?: string }> = {}
+    const timesMap: Record<string, { start_time?: string; end_time?: string; show_answers?: boolean }> = {}
     const assignmentIds = assignments.map((a) => a.id)
     if (assignmentIds.length > 0) {
       const timesSnaps = await Promise.all(assignmentIds.map(id => getDoc(doc(db, 'exam_assignments', id))))
       timesSnaps.forEach((a) => {
         if (a.exists()) {
           const data = a.data() as any
-          timesMap[a.id] = { start_time: data.start_time, end_time: data.end_time }
+          timesMap[a.id] = {
+            start_time: data.start_time,
+            end_time: data.end_time,
+            show_answers: data.show_answers
+          }
         }
       })
     }
@@ -520,6 +525,7 @@ export const examApi = {
             ...exam,
             start_time: times.start_time || (exam as any).start_time || null,
             end_time: times.end_time || (exam as any).end_time || null,
+            show_answers: times.show_answers !== undefined ? times.show_answers : false,
             subject: exam.subject_id ? subjectsMap[exam.subject_id] || null : null,
             teacher: exam.teacher_id ? teachersMap[exam.teacher_id] || null : null,
           }

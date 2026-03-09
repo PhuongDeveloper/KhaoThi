@@ -17,6 +17,7 @@ export default function TeacherExamEdit() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [assigning, setAssigning] = useState(false)
+  const [showAnswers, setShowAnswers] = useState(false)
   const [subjects, setSubjects] = useState<any[]>([])
   const [classes, setClasses] = useState<any[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string>('')
@@ -97,7 +98,7 @@ export default function TeacherExamEdit() {
       if (formData.status === 'published' && selectedClassId) {
         const startStr = formData.start_time ? new Date(formData.start_time).toISOString() : new Date(Date.now() + 5 * 60000).toISOString();
         const endStr = formData.end_time ? new Date(formData.end_time).toISOString() : '';
-        await examApi.assignExamToClass(id!, selectedClassId, startStr, endStr)
+        await examApi.assignExamToClass(id!, selectedClassId, startStr, endStr, showAnswers)
         toast.success('Cập nhật và giao bài thi thành công')
       } else {
         toast.success('Cập nhật bài thi thành công')
@@ -116,7 +117,7 @@ export default function TeacherExamEdit() {
     try {
       const startStr = formData.start_time ? new Date(formData.start_time).toISOString() : new Date(Date.now() + 5 * 60000).toISOString();
       const endStr = formData.end_time ? new Date(formData.end_time).toISOString() : '';
-      await examApi.assignExamToClass(id!, selectedClassId, startStr, endStr)
+      await examApi.assignExamToClass(id!, selectedClassId, startStr, endStr, showAnswers)
       toast.success('Giao bài thi cho lớp thành công')
       setSelectedClassId('')
     } catch (error: any) {
@@ -341,6 +342,25 @@ export default function TeacherExamEdit() {
                     <option key={c.id} value={c.id}>{c.name} ({c.total_students} học sinh)</option>
                   ))}
                 </select>
+
+                {/* Cho phép xem đáp án ngay */}
+                <div className="flex items-start bg-white p-3 rounded-lg border border-primary-100 mt-2">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="showAnswersEdit"
+                      type="checkbox"
+                      checked={showAnswers}
+                      onChange={(e) => setShowAnswers(e.target.checked)}
+                      className="w-4 h-4 text-primary-600 bg-white border-gray-300 rounded focus:ring-primary-500"
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="showAnswersEdit" className="font-medium text-gray-900 cursor-pointer">
+                      Cho phép xem đáp án ngay sau khi nộp
+                    </label>
+                  </div>
+                </div>
+
                 <button
                   onClick={handleAssignToClass}
                   disabled={!selectedClassId || assigning}
