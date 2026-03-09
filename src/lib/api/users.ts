@@ -106,7 +106,7 @@ export const userApi = {
         let counter = 1
         let userCredential = null
         let retries = 0;
-        const MAX_RETRIES = 3;
+        const MAX_RETRIES = 10;
 
         while (!userCredential && retries < MAX_RETRIES) {
           try {
@@ -123,12 +123,18 @@ export const userApi = {
               error.message?.includes('400')
             ) {
               retries++;
+
               if (retries >= MAX_RETRIES) {
                 console.error(`Firebase error for ${student.full_name} sau ${MAX_RETRIES} lần thử:`, error);
-                throw new Error(`Lỗi Firebase khi tạo tài khoản ${student.full_name} (${error.code || error.message}). Vui lòng thử lại sau vài phút.`);
+                throw new Error(`Lỗi Firebase khi tạo tài khoản ${student.full_name} (${error.code || error.message}). Vui lòng chia nhỏ file Excel ra hoặc thử lại sau vài phút.`);
               }
-              // Backoff delay: 3s, 6s
-              await delay(3000 * retries);
+
+              // Exponential backoff dài hơn để tránh limit (VD: 5s, 10s, 15s...)
+              const waitTimeMs = 5000 * retries;
+              if (onProgress) {
+                onProgress(currentProcessed, total, `${student.full_name} (Rate-limit, đang chờ ${waitTimeMs / 1000}s thử lại lần ${retries}...)`);
+              }
+              await delay(waitTimeMs);
             } else if (error.code === 'auth/invalid-email') {
               // Nếu email lỗi cú pháp, thử random để ko bị văng
               currentEmail = `student_${Date.now()}_${counter}@gmail.com`;
@@ -164,8 +170,8 @@ export const userApi = {
             password: commonPassword
           })
 
-          // NGHỈ 1500ms ĐỂ TRÁNH LỖI MẠNG VÀ SPAM FIREBASE AUTH (QUOTA THƯỜNG RẤT GẮT)
-          await delay(1500)
+          // Tăng thời gian giãn cách lên 2000ms để Firebase Auth không chặn nhầm do DDoS
+          await delay(2000)
         }
       }
     } finally {
