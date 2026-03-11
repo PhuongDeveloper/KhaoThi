@@ -99,17 +99,21 @@ export default function TeacherExamResults() {
     return <div className="flex items-center justify-center h-64"><LoadingSpinner size="lg" /></div>
   }
 
-  const submittedAttempts = attempts.filter(a => a.status === 'submitted' || a.status === 'timeout')
+  const submittedAttempts = attempts.filter((a: any) => a.status === 'submitted' || a.status === 'timeout')
+  const rankedAttempts = [...submittedAttempts].sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
+  const totalScore = exam?.total_score || 10
+  const passingThreshold = ((exam?.passing_score || 50) / 100) * totalScore
   const avgScore = submittedAttempts.length > 0
-    ? submittedAttempts.reduce((sum, a) => sum + (a.percentage || 0), 0) / submittedAttempts.length : 0
-  const passCount = submittedAttempts.filter(a => (a.percentage || 0) >= (exam?.passing_score || 50)).length
+    ? submittedAttempts.reduce((sum: number, a: any) => sum + (a.score || 0), 0) / submittedAttempts.length : 0
+  const passCount = submittedAttempts.filter((a: any) => (a.score || 0) >= passingThreshold).length
+  const highestScore = rankedAttempts[0]?.score || 0
 
   const scoreDistribution = [
-    { range: '0–20%', count: submittedAttempts.filter(a => (a.percentage || 0) < 20).length },
-    { range: '20–40%', count: submittedAttempts.filter(a => (a.percentage || 0) >= 20 && (a.percentage || 0) < 40).length },
-    { range: '40–60%', count: submittedAttempts.filter(a => (a.percentage || 0) >= 40 && (a.percentage || 0) < 60).length },
-    { range: '60–80%', count: submittedAttempts.filter(a => (a.percentage || 0) >= 60 && (a.percentage || 0) < 80).length },
-    { range: '80–100%', count: submittedAttempts.filter(a => (a.percentage || 0) >= 80).length },
+    { range: `0–${(totalScore * 0.2).toFixed(1)}`, count: submittedAttempts.filter(a => (a.score || 0) < totalScore * 0.2).length },
+    { range: `${(totalScore * 0.2).toFixed(1)}–${(totalScore * 0.4).toFixed(1)}`, count: submittedAttempts.filter(a => (a.score || 0) >= totalScore * 0.2 && (a.score || 0) < totalScore * 0.4).length },
+    { range: `${(totalScore * 0.4).toFixed(1)}–${(totalScore * 0.6).toFixed(1)}`, count: submittedAttempts.filter(a => (a.score || 0) >= totalScore * 0.4 && (a.score || 0) < totalScore * 0.6).length },
+    { range: `${(totalScore * 0.6).toFixed(1)}–${(totalScore * 0.8).toFixed(1)}`, count: submittedAttempts.filter(a => (a.score || 0) >= totalScore * 0.6 && (a.score || 0) < totalScore * 0.8).length },
+    { range: `${(totalScore * 0.8).toFixed(1)}–${totalScore}`, count: submittedAttempts.filter(a => (a.score || 0) >= totalScore * 0.8).length },
   ]
 
   const questionTypeStats = ['multiple_choice', 'true_false_multi', 'short_answer'].map(type => {
@@ -126,8 +130,6 @@ export default function TeacherExamResults() {
     { name: 'Đạt', value: passCount, color: '#10b981' },
     { name: 'Không đạt', value: submittedAttempts.length - passCount, color: '#ef4444' },
   ]
-
-  const rankedAttempts = [...submittedAttempts].sort((a, b) => (b.percentage || 0) - (a.percentage || 0))
 
   return (
     <div className="space-y-6">
@@ -146,9 +148,9 @@ export default function TeacherExamResults() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Học sinh nộp bài', value: submittedAttempts.length, icon: Users, color: 'text-blue-600 bg-blue-50' },
-          { label: 'Điểm trung bình', value: `${avgScore.toFixed(1)}%`, icon: TrendingUp, color: 'text-purple-600 bg-purple-50' },
+          { label: 'Điểm trung bình', value: `${avgScore.toFixed(2)}/${totalScore}`, icon: TrendingUp, color: 'text-purple-600 bg-purple-50' },
           { label: 'Tỷ lệ đạt', value: `${submittedAttempts.length ? Math.round(passCount / submittedAttempts.length * 100) : 0}%`, icon: Trophy, color: 'text-green-600 bg-green-50' },
-          { label: 'Điểm cao nhất', value: `${rankedAttempts[0]?.percentage || 0}%`, icon: Trophy, color: 'text-yellow-600 bg-yellow-50' },
+          { label: 'Điểm cao nhất', value: `${Number(highestScore).toFixed(2)}/${totalScore}`, icon: Trophy, color: 'text-yellow-600 bg-yellow-50' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-center justify-between">
@@ -269,7 +271,7 @@ export default function TeacherExamResults() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Hạng', 'Học sinh', 'Điểm', 'Tỉ lệ', 'Thời gian', 'Vi phạm', 'Trạng thái', ''].map(h => (
+                  {['Hạng', 'Học sinh', 'Điểm', 'Kết quả', 'Thời gian', 'Vi phạm', 'Trạng thái', ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -278,14 +280,15 @@ export default function TeacherExamResults() {
                 {rankedAttempts.map((attempt, idx) => {
                   const rank = idx + 1
                   const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}`
-                  const isPassing = (attempt.percentage || 0) >= (exam?.passing_score || 50)
                   return (
                     <tr key={attempt.id} className={`hover:bg-gray-50 transition-colors ${rank <= 3 ? 'bg-yellow-50/30' : ''}`}>
                       <td className="px-4 py-3 text-sm font-bold text-gray-700">{rankIcon}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{(attempt.student as any)?.full_name || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{attempt.score || 0}/{exam?.total_score || 10}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">{attempt.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}</td>
                       <td className="px-4 py-3 text-sm">
-                        <span className={`font-semibold ${isPassing ? 'text-green-600' : 'text-red-600'}`}>{attempt.percentage || 0}%</span>
+                        <span className={`font-semibold ${(attempt.score || 0) >= passingThreshold ? 'text-green-600' : 'text-red-600'}`}>
+                          {(attempt.score || 0) >= passingThreshold ? '✓ Đạt' : '✗ Chưa đạt'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {attempt.time_spent_seconds ? `${Math.floor(attempt.time_spent_seconds / 60)}:${String(attempt.time_spent_seconds % 60).padStart(2, '0')}` : '-'}

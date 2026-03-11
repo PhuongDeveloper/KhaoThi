@@ -174,7 +174,7 @@ export default function StudentExamReview() {
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold">
-                {attempt?.score?.toFixed(2) || 0}/{exam?.total_score || 10}
+                {attempt?.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}
               </p>
               <p className="text-white/90">Điểm số</p>
             </div>
@@ -279,7 +279,7 @@ export default function StudentExamReview() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold">
-              {attempt?.score?.toFixed(2) || 0}/{exam?.total_score || 10}
+              {attempt?.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}
             </p>
             <p className="text-white/90">Điểm số</p>
           </div>
@@ -516,15 +516,9 @@ export default function StudentExamReview() {
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-gray-900">
-              {attempt?.score?.toFixed(2) || 0}
+              {attempt?.score != null ? Number(attempt.score).toFixed(2) : '0'}
             </p>
             <p className="text-sm text-gray-600">Tổng điểm</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">
-              {attempt?.percentage || 0}%
-            </p>
-            <p className="text-sm text-gray-600">Tỷ lệ</p>
           </div>
         </div>
       </div>

@@ -27,7 +27,7 @@ export default function StudentExamResult() {
     try {
       const examData = await examApi.getExamById(id!)
       const attempts = await examApi.getAttempts()
-      
+
       // Lấy attempt của học sinh hiện tại cho bài thi này
       const myAttempt = attempts.find(
         (a: any) => a.exam_id === id && a.student_id === profile?.id
@@ -84,7 +84,7 @@ export default function StudentExamResult() {
             {isPassed ? 'Chúc mừng! Bạn đã đạt' : 'Bạn chưa đạt'}
           </h1>
           <p className="text-2xl font-bold text-primary-600 mb-4">
-            {attempt?.score?.toFixed(2) || 0}/{exam?.total_score || 10} điểm ({attempt?.percentage || 0}%)
+            {attempt?.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10} điểm
           </p>
           <p className="text-gray-600">
             Điểm đạt: {exam?.passing_score}%
@@ -101,8 +101,8 @@ export default function StudentExamResult() {
               <p className="text-xl font-bold text-gray-900">
                 {attempt?.time_spent_seconds
                   ? `${Math.floor(attempt.time_spent_seconds / 60)}:${String(
-                      attempt.time_spent_seconds % 60
-                    ).padStart(2, '0')}`
+                    attempt.time_spent_seconds % 60
+                  ).padStart(2, '0')}`
                   : '-'}
               </p>
             </div>

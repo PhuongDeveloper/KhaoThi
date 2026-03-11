@@ -778,8 +778,16 @@ export const examApi = {
     if (!isAdminOrTeacher && attemptCheck.student_id !== user.uid) {
       throw new Error('Unauthorized: This attempt does not belong to you')
     }
-    if (!isAdminOrTeacher && attemptCheck.status !== 'in_progress') {
-      throw new Error('Cannot modify responses: Exam has already been submitted')
+
+    // Cho phép nộp khi còn in_progress hoặc bị timeout do race condition
+    // Nếu đã submitted hoặc violation thì mới reject
+    const currentStatus = attemptCheck.status
+    if (!isAdminOrTeacher) {
+      if (currentStatus === 'submitted' || currentStatus === 'violation') {
+        // Bài đã nộp rồi (không phải từ race condition timeout)
+        throw new Error('Bài thi đã được nộp trước đó, không thể nộp lại')
+      }
+      // Còn in_progress hoặc timeout -> cho phép nộp (timeout là race condition server)
     }
 
     const responsesSnap = await getDocs(
@@ -815,12 +823,6 @@ export const examApi = {
       status,
       violations_count: violations.length,
       violations_data: violations,
-    }
-
-    if (!isAdminOrTeacher) {
-      if (attemptCheck.student_id !== user.uid || attemptCheck.status !== 'in_progress') {
-        throw new Error('Cannot modify responses: Exam has already been submitted')
-      }
     }
 
     await updateDoc(attemptRef, updateData as any)

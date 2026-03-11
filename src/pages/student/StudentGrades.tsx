@@ -29,10 +29,10 @@ export default function StudentGrades() {
         subjectApi.getAll(),
         examApi.getAttempts(undefined, true)
       ])
-      
+
       setSubjects(subjectsData)
       setAttempts(attemptsData || [])
-      
+
       if (subjectsData.length > 0 && !selectedSubject) {
         setSelectedSubject(subjectsData[0].id)
       }
@@ -71,26 +71,29 @@ export default function StudentGrades() {
         highest: 0,
         lowest: 0,
         passed: 0,
-        total: 0
+        total: 0,
+        totalScore: 10
       }
     }
 
-    const percentages = subjectAttempts.map((a: any) => a.percentage || 0)
     const exam = subjectAttempts[0]?.exam
-    const passingScore = exam?.passing_score || 50
+    const totalScore = exam?.total_score || 10
+    const passingThreshold = ((exam?.passing_score || 50) / 100) * totalScore
+    const scores = subjectAttempts.map((a: any) => parseFloat(a.score) || 0)
 
     return {
-      average: percentages.reduce((a, b) => a + b, 0) / percentages.length,
-      highest: Math.max(...percentages),
-      lowest: Math.min(...percentages),
-      passed: percentages.filter(p => p >= passingScore).length,
-      total: subjectAttempts.length
+      average: scores.reduce((a, b) => a + b, 0) / scores.length,
+      highest: Math.max(...scores),
+      lowest: Math.min(...scores),
+      passed: scores.filter(s => s >= passingThreshold).length,
+      total: subjectAttempts.length,
+      totalScore
     }
   }
 
   const getChartData = () => {
     if (!selectedSubject) return []
-    
+
     const subjectAttempts = getSubjectAttempts(selectedSubject)
     return subjectAttempts
       .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -105,12 +108,12 @@ export default function StudentGrades() {
 
   const getPieData = () => {
     if (!selectedSubject) return []
-    
+
     const subjectAttempts = getSubjectAttempts(selectedSubject)
     const exam = subjectAttempts[0]?.exam
-    const passingScore = exam?.passing_score || 50
-    
-    const passed = subjectAttempts.filter((a: any) => (a.percentage || 0) >= passingScore).length
+    const totalScore = exam?.total_score || 10
+    const passingThreshold = ((exam?.passing_score || 50) / 100) * totalScore
+    const passed = subjectAttempts.filter((a: any) => (parseFloat(a.score) || 0) >= passingThreshold).length
     const failed = subjectAttempts.length - passed
 
     return [
@@ -156,16 +159,15 @@ export default function StudentGrades() {
           {subjects.map((subject) => {
             const subjectStats = getSubjectStats(subject.id)
             const isSelected = selectedSubject === subject.id
-            
+
             return (
               <button
                 key={subject.id}
                 onClick={() => setSelectedSubject(subject.id)}
-                className={`p-3 rounded-lg border transition-all text-left ${
-                  isSelected
+                className={`p-3 rounded-lg border transition-all text-left ${isSelected
                     ? 'border-gray-400 bg-gray-50'
                     : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <div className="flex items-center space-x-2 mb-1">
                   <BookOpen className={`h-4 w-4 ${isSelected ? 'text-gray-700' : 'text-gray-500'}`} />
@@ -191,7 +193,7 @@ export default function StudentGrades() {
                 <p className="text-sm text-gray-600">Điểm trung bình</p>
                 <TrendingUp className="h-5 w-5 text-gray-500" />
               </div>
-              <p className="text-3xl font-semibold text-gray-900">{stats.average.toFixed(1)}%</p>
+              <p className="text-3xl font-semibold text-gray-900">{stats.average.toFixed(2)}/{stats.totalScore}</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-5">
@@ -199,7 +201,7 @@ export default function StudentGrades() {
                 <p className="text-sm text-gray-600">Điểm cao nhất</p>
                 <BarChart3 className="h-5 w-5 text-gray-500" />
               </div>
-              <p className="text-3xl font-semibold text-gray-900">{stats.highest}%</p>
+              <p className="text-3xl font-semibold text-gray-900">{stats.highest.toFixed(2)}/{stats.totalScore}</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-5">
@@ -207,7 +209,7 @@ export default function StudentGrades() {
                 <p className="text-sm text-gray-600">Điểm thấp nhất</p>
                 <TrendingUp className="h-5 w-5 text-gray-500 rotate-180" />
               </div>
-              <p className="text-3xl font-semibold text-gray-900">{stats.lowest}%</p>
+              <p className="text-3xl font-semibold text-gray-900">{stats.lowest.toFixed(2)}/{stats.totalScore}</p>
             </div>
 
             <div className="bg-white border border-gray-200 rounded-lg p-5">
@@ -237,17 +239,17 @@ export default function StudentGrades() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="name" stroke="#6b7280" />
                     <YAxis domain={[0, 100]} stroke="#6b7280" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#fff', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
                         border: '1px solid #e5e7eb',
                         borderRadius: '6px'
-                      }} 
+                      }}
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="percentage" 
-                      stroke="#4b5563" 
+                    <Line
+                      type="monotone"
+                      dataKey="percentage"
+                      stroke="#4b5563"
                       strokeWidth={2}
                       name="Điểm (%)"
                       dot={{ fill: '#4b5563', r: 4 }}
@@ -266,12 +268,12 @@ export default function StudentGrades() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="name" stroke="#6b7280" />
                     <YAxis stroke="#6b7280" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#fff', 
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
                         border: '1px solid #e5e7eb',
                         borderRadius: '6px'
-                      }} 
+                      }}
                     />
                     <Bar dataKey="score" fill="#6b7280" name="Điểm số" radius={[4, 4, 0, 0]} />
                   </BarChart>
@@ -302,12 +304,12 @@ export default function StudentGrades() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: '#fff', 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
                       border: '1px solid #e5e7eb',
                       borderRadius: '6px'
-                    }} 
+                    }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -355,18 +357,18 @@ export default function StudentGrades() {
                   ) : (
                     getSubjectAttempts(selectedSubject).map((attempt: any) => {
                       const exam = attempt.exam
-                      const isPassed = (attempt.percentage || 0) >= (exam?.passing_score || 50)
-                      
+                      const isPassed = (parseFloat(attempt.score) || 0) >= ((exam?.passing_score || 50) / 100) * (exam?.total_score || 10)
+
                       return (
                         <tr key={attempt.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm font-medium text-gray-900">
                             {exam?.title || '-'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {attempt.score?.toFixed(2) || 0}/{exam?.total_score || 10}
+                            {attempt.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {attempt.percentage || 0}%
+                            {/* Điểm đầy đủ */}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {new Date(attempt.created_at).toLocaleDateString('vi-VN')}

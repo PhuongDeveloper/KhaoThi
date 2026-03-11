@@ -113,7 +113,15 @@ export const useAuthStore = create<AuthState>()(
           return { profile: profileData }
         } catch (error: any) {
           console.error('[AuthStore] Lỗi đăng nhập:', error)
-          throw new Error(error.message || 'Đăng nhập thất bại')
+          const code = error?.code || ''
+          let message = 'Tài khoản hoặc mật khẩu không chính xác'
+          if (
+            code === 'auth/too-many-requests'
+          ) message = 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau vài phút.'
+          else if (code === 'auth/user-disabled') message = 'Tài khoản đã bị vô hiệu hóa'
+          else if (code === 'auth/network-request-failed') message = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại kết nối.'
+          // code === 'auth/invalid-credential' or 'auth/wrong-password' or 'auth/user-not-found' -> default
+          throw new Error(message)
         } finally {
           set({ loading: false })
         }

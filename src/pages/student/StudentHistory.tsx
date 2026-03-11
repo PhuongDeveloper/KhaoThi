@@ -113,20 +113,20 @@ export default function StudentHistory() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {attempts.map((attempt) => {
                   const exam = attempt.exam
-                  const isPassed = (attempt.percentage || 0) >= (exam?.passing_score || 50)
+                  const isPassed = (attempt.score || 0) >= ((exam?.passing_score || 50) / 100) * (exam?.total_score || 10)
                   return (
                     <tr key={attempt.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">
                         {exam?.title || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {attempt.score || 0}/{exam?.total_score || 10} ({attempt.percentage || 0}%)
+                        {attempt.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {attempt.time_spent_seconds
                           ? `${Math.floor(attempt.time_spent_seconds / 60)}:${String(
-                              attempt.time_spent_seconds % 60
-                            ).padStart(2, '0')}`
+                            attempt.time_spent_seconds % 60
+                          ).padStart(2, '0')}`
                           : '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">

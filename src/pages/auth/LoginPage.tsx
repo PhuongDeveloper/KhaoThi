@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
@@ -7,43 +7,26 @@ import Loader from '../../components/Loader'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const { signIn, loading } = useAuthStore()
+  const [justLoggedIn, setJustLoggedIn] = useState(false)
+  const { signIn, loading, profile } = useAuthStore()
   const navigate = useNavigate()
+
+  // Khi đăng nhập thành công, chờ profile cập nhật rồi tự redirect
+  useEffect(() => {
+    if (justLoggedIn && profile) {
+      toast.success('Đăng nhập thành công', { id: 'login-success' })
+      const role = profile.role
+      if (role === 'admin') navigate('/admin', { replace: true })
+      else if (role === 'teacher') navigate('/teacher', { replace: true })
+      else navigate('/student', { replace: true })
+    }
+  }, [justLoggedIn, profile, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const result: any = await signIn(email, password)
-
-      // Đợi một chút để đảm bảo state được cập nhật hoàn toàn
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Lấy profile từ result hoặc từ store (đã được cập nhật)
-      let currentProfile = result?.profile || useAuthStore.getState().profile
-
-      // Nếu vẫn chưa có profile, retry fetch
-      if (!currentProfile) {
-        console.log('[LoginPage] Profile chưa có, đang retry fetch...')
-        currentProfile = await useAuthStore.getState().fetchProfile()
-      }
-
-      if (currentProfile) {
-        toast.success('Đăng nhập thành công')
-        console.log('[LoginPage] Profile:', currentProfile)
-
-        // Redirect ngay lập tức
-        const role = currentProfile.role
-        if (role === 'admin') {
-          navigate('/admin', { replace: true })
-        } else if (role === 'teacher') {
-          navigate('/teacher', { replace: true })
-        } else {
-          navigate('/student', { replace: true })
-        }
-      } else {
-        console.error('[LoginPage] Không thể lấy profile sau khi đăng nhập')
-        toast.error('Không thể lấy thông tin người dùng. Vui lòng thử lại.')
-      }
+      await signIn(email, password)
+      setJustLoggedIn(true)
     } catch (error: any) {
       toast.error(error.message || 'Đăng nhập thất bại')
     }

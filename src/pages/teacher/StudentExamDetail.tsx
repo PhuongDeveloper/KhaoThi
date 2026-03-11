@@ -141,12 +141,9 @@ export default function StudentExamDetail() {
           </div>
           <div className="text-right">
             <p className="text-2xl font-bold">
-              {attempt?.score?.toFixed(2) || 0}/{exam?.total_score || 10}
+              {attempt?.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}
             </p>
             <p className="text-white/90">Điểm số</p>
-            <p className="text-lg font-semibold mt-1">
-              {attempt?.percentage || 0}%
-            </p>
           </div>
         </div>
       </div>
@@ -222,18 +219,18 @@ export default function StudentExamDetail() {
                         <div
                           key={answer.id}
                           className={`p-4 rounded-lg border-2 ${isCorrectAnswer
-                              ? 'bg-green-50 border-green-500'
-                              : isSelected
-                                ? 'bg-red-50 border-red-500'
-                                : 'bg-gray-50 border-gray-200'
+                            ? 'bg-green-50 border-green-500'
+                            : isSelected
+                              ? 'bg-red-50 border-red-500'
+                              : 'bg-gray-50 border-gray-200'
                             }`}
                         >
                           <div className="flex items-center space-x-3">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${isCorrectAnswer
-                                ? 'bg-green-500 text-white'
-                                : isSelected
-                                  ? 'bg-red-500 text-white'
-                                  : 'bg-gray-300 text-gray-600'
+                              ? 'bg-green-500 text-white'
+                              : isSelected
+                                ? 'bg-red-500 text-white'
+                                : 'bg-gray-300 text-gray-600'
                               }`}>
                               {String.fromCharCode(65 + aidx)}
                             </div>
@@ -279,10 +276,10 @@ export default function StudentExamDetail() {
                         <div
                           key={answer.id}
                           className={`p-4 rounded-lg border-2 ${isCorrect && studentAnswer !== null
-                              ? 'bg-green-50 border-green-500'
-                              : studentAnswer !== null
-                                ? 'bg-red-50 border-red-500'
-                                : 'bg-gray-50 border-gray-200'
+                            ? 'bg-green-50 border-green-500'
+                            : studentAnswer !== null
+                              ? 'bg-red-50 border-red-500'
+                              : 'bg-gray-50 border-gray-200'
                             }`}
                         >
                           <div className="flex items-center justify-between">
@@ -295,16 +292,16 @@ export default function StudentExamDetail() {
                             <div className="flex items-center space-x-3 ml-4">
                               {/* Đáp án đúng */}
                               <div className={`px-3 py-1 rounded-lg font-semibold ${correctAnswer
-                                  ? 'bg-green-500 text-white'
-                                  : 'bg-red-500 text-white'
+                                ? 'bg-green-500 text-white'
+                                : 'bg-red-500 text-white'
                                 }`}>
                                 {correctAnswer ? 'Đúng' : 'Sai'}
                               </div>
                               {/* Đáp án học sinh chọn */}
                               {studentAnswer !== null && (
                                 <div className={`px-3 py-1 rounded-lg font-semibold border-2 ${studentAnswer
-                                    ? 'bg-green-100 text-green-700 border-green-500'
-                                    : 'bg-red-100 text-red-700 border-red-500'
+                                  ? 'bg-green-100 text-green-700 border-green-500'
+                                  : 'bg-red-100 text-red-700 border-red-500'
                                   }`}>
                                   {studentAnswer ? 'Đúng' : 'Sai'}
                                 </div>
@@ -392,15 +389,9 @@ export default function StudentExamDetail() {
           </div>
           <div className="text-center">
             <p className="text-2xl font-bold text-gray-900">
-              {attempt?.score?.toFixed(2) || 0}
+              {attempt?.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}
             </p>
             <p className="text-sm text-gray-600">Tổng điểm</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">
-              {attempt?.percentage || 0}%
-            </p>
-            <p className="text-sm text-gray-600">Tỷ lệ</p>
           </div>
         </div>
       </div>
