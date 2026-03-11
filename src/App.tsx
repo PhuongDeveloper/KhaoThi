@@ -38,13 +38,15 @@ function App() {
     const originalReplaceState = history.replaceState
 
     history.pushState = function (...args) {
-      originalPushState.apply(history, args)
+      const result = originalPushState.apply(this, args)
       setTimeout(fixLocalhostRedirect, 0)
+      return result
     }
 
     history.replaceState = function (...args) {
-      originalReplaceState.apply(history, args)
+      const result = originalReplaceState.apply(this, args)
       setTimeout(fixLocalhostRedirect, 0)
+      return result
     }
 
     return () => {
