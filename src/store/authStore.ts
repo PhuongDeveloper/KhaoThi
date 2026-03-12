@@ -54,15 +54,15 @@ export const useAuthStore = create<AuthState>()(
       loading: false,
       initialized: false,
 
-      // Khởi tạo auth: lắng nghe onAuthStateChanged một lần để restore session sau khi reload
+      // Khởi tạo auth: lắng nghe onAuthStateChanged để đồng bộ session
       initialize: async () => {
         // Nếu đã init rồi thì không cần làm lại
         if (get().initialized) return
 
         set({ loading: true })
 
-        await new Promise<void>((resolve) => {
-          const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        return new Promise<void>((resolve) => {
+          onAuthStateChanged(auth, async (user) => {
             try {
               // Đồng bộ state với Firebase Auth
               set({ user: user ?? null, session: null })
@@ -80,9 +80,11 @@ export const useAuthStore = create<AuthState>()(
                 set({ profile: null })
               }
             } finally {
-              set({ loading: false, initialized: true })
-              unsubscribe()
-              resolve()
+              // Lần đầu tiên chạy xong sẽ đánh dấu initialized
+              if (!get().initialized) {
+                set({ loading: false, initialized: true })
+                resolve()
+              }
             }
           })
         })
@@ -271,8 +273,15 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage', // Tên key trong localStorage
       partialize: (state) => ({
-        // Chỉ lưu profile, để Firebase tự quản lý session & user
+        // Lưu profile và thông tin user cơ bản để UI có thể render ngay lập tức
+        // Firebase Auth sẽ vẫn là nguồn trung thực tuyệt đối sau khi khởi tạo xong
         profile: state.profile,
+        user: state.user ? {
+          uid: state.user.uid,
+          email: state.user.email,
+          displayName: state.user.displayName,
+          photoURL: state.user.photoURL,
+        } as FirebaseUser : null,
       }),
     }
   )

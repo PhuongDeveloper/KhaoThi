@@ -16,13 +16,11 @@ export default function LoginPage() {
     if (justLoggedIn && profile) {
       toast.success('Đăng nhập thành công', { id: 'login-success' })
       const role = profile.role
-      // Dùng window.location.href để đảm bảo App re-render toàn bộ với state đã login
-      // Tránh lỗi history API override trong App.tsx làm cho React Router hỏng
-      if (role === 'admin') window.location.href = '/admin'
-      else if (role === 'teacher') window.location.href = '/teacher'
-      else window.location.href = '/student'
+      if (role === 'admin') navigate('/admin', { replace: true })
+      else if (role === 'teacher') navigate('/teacher', { replace: true })
+      else navigate('/student', { replace: true })
     }
-  }, [justLoggedIn, profile])
+  }, [justLoggedIn, profile, navigate])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
