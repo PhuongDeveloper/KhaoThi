@@ -7,6 +7,7 @@ import StudentExamResult from '../pages/student/StudentExamResult'
 import StudentExamReview from '../pages/student/StudentExamReview'
 import StudentHistory from '../pages/student/StudentHistory'
 import StudentGrades from '../pages/student/StudentGrades'
+import StudentAIPractice from '../pages/student/StudentAIPractice'
 import Layout from '../components/Layout'
 
 export default function StudentLayout() {
@@ -21,6 +22,7 @@ export default function StudentLayout() {
         <Route path="/exams/:id/review" element={<StudentExamReview />} />
         <Route path="/history" element={<StudentHistory />} />
         <Route path="/grades" element={<StudentGrades />} />
+        <Route path="/ai-practice" element={<StudentAIPractice />} />
         <Route path="*" element={<Navigate to="/student" replace />} />
       </Routes>
     </Layout>

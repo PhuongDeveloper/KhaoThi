@@ -29,14 +29,15 @@ export default function LoginPage() {
     e.preventDefault()
     try {
       const result = await signIn(email, password)
-      // signIn đã set profile vào store, lấy profile từ kết quả trả về
       const userProfile = result?.profile || useAuthStore.getState().profile
       if (userProfile) {
-        toast.success('Đăng nhập thành công', { id: 'login-success' })
+        toast.success('Đăng nhập thành công! Đang chuyển trang...', { id: 'login-success', duration: 3000 })
         const role = userProfile.role
-        if (role === 'admin') navigate('/admin', { replace: true })
-        else if (role === 'teacher') navigate('/teacher', { replace: true })
-        else navigate('/student', { replace: true })
+        const targetPath = role === 'admin' ? '/admin' : role === 'teacher' ? '/teacher' : '/student'
+        // Tự động reload sau 2s để đảm bảo Firebase khởi tạo hoàn tất
+        setTimeout(() => {
+          window.location.href = targetPath
+        }, 2000)
       }
     } catch (error: any) {
       toast.error(error.message || 'Đăng nhập thất bại')

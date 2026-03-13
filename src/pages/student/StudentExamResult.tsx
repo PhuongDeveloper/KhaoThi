@@ -4,8 +4,9 @@ import { examApi } from '../../lib/api/exams'
 import { db } from '../../lib/firebase'
 import { collection, query, where, getDocs } from 'firebase/firestore'
 import { useAuthStore } from '../../store/authStore'
+import { autoGeneratePracticeAfterExam } from '../../lib/api/ai-student'
 import toast from 'react-hot-toast'
-import { CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, AlertTriangle, Brain, Sparkles } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function StudentExamResult() {
@@ -16,6 +17,8 @@ export default function StudentExamResult() {
   const [attempt, setAttempt] = useState<any>(null)
   const [responses, setResponses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [aiPracticeGenerated, setAiPracticeGenerated] = useState(false)
+  const [aiGenerating, setAiGenerating] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -54,6 +57,23 @@ export default function StudentExamResult() {
       }))
 
       setResponses(responsesData || [])
+
+      // Tự động tạo bài luyện tập AI từ câu sai
+      const wrongCount = responsesData.filter((r: any) => !r.is_correct).length
+      if (wrongCount > 0 && profile?.id && id) {
+        setAiGenerating(true)
+        autoGeneratePracticeAfterExam(profile.id, id)
+          .then((session) => {
+            if (session) {
+              setAiPracticeGenerated(true)
+              toast.success('🤖 AI đã tạo bài luyện tập từ các câu sai!', { duration: 5000 })
+            }
+          })
+          .catch((err) => {
+            console.error('[AI] Lỗi tạo bài luyện tập:', err)
+          })
+          .finally(() => setAiGenerating(false))
+      }
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi tải kết quả')
     } finally {
@@ -145,6 +165,40 @@ export default function StudentExamResult() {
           Lịch sử làm bài
         </Link>
       </div>
+
+      {/* AI Practice prompt */}
+      {(aiPracticeGenerated || aiGenerating) && (
+        <div className="mt-6 bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-200 rounded-xl p-5">
+          <div className="flex items-center gap-3">
+            {aiGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-violet-500 border-t-transparent" />
+                <div>
+                  <p className="font-medium text-violet-800">🤖 AI đang phân tích câu sai và tạo bài luyện tập...</p>
+                  <p className="text-sm text-violet-600">Chờ trong giây lát</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-2 bg-violet-100 rounded-lg">
+                  <Sparkles className="h-6 w-6 text-violet-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-violet-800">🎯 AI đã tạo bài luyện tập từ các câu em làm sai!</p>
+                  <p className="text-sm text-violet-600">Luyện tập ngay để nắm vững kiến thức</p>
+                </div>
+                <Link
+                  to="/student/ai-practice"
+                  className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-medium"
+                >
+                  <Brain className="h-4 w-4" />
+                  Luyện tập ngay
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

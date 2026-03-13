@@ -10,7 +10,8 @@ import {
   BarChart3,
   School,
   Menu,
-  X
+  X,
+  Brain
 } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
@@ -57,6 +58,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/student/exams', label: 'Bài thi', icon: ClipboardList },
     { path: '/student/history', label: 'Lịch sử', icon: BarChart3 },
     { path: '/student/grades', label: 'Bảng điểm', icon: BarChart3 },
+    { path: '/student/ai-practice', label: 'AI Trợ lý', icon: Brain },
   ]
 
   const navItems = isAdmin ? adminNavItems : isTeacher ? teacherNavItems : studentNavItems
