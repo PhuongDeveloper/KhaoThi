@@ -13,50 +13,6 @@ import Loader from './components/Loader'
 function App() {
   const { initialize, initialized, loading } = useAuthStore()
 
-  // Intercept và fix redirect về localhost issue
-  useEffect(() => {
-    const fixLocalhostRedirect = () => {
-      const currentOrigin = window.location.origin
-
-      // Nếu detect redirect về localhost, fix ngay lập tức
-      if (currentOrigin.includes('localhost:3000') || currentOrigin.includes('localhost')) {
-        const productionUrl = 'https://www.hethongthi.online'
-        const pathname = window.location.pathname
-        const search = window.location.search
-        const hash = window.location.hash
-        const newUrl = `${productionUrl}${pathname}${search}${hash}`
-        window.location.replace(newUrl)
-        return
-      }
-    }
-
-    fixLocalhostRedirect()
-    window.addEventListener('popstate', fixLocalhostRedirect)
-    window.addEventListener('hashchange', fixLocalhostRedirect)
-
-    const originalPushState = history.pushState
-    const originalReplaceState = history.replaceState
-
-    history.pushState = function (...args) {
-      const result = originalPushState.apply(this, args)
-      setTimeout(fixLocalhostRedirect, 0)
-      return result
-    }
-
-    history.replaceState = function (...args) {
-      const result = originalReplaceState.apply(this, args)
-      setTimeout(fixLocalhostRedirect, 0)
-      return result
-    }
-
-    return () => {
-      window.removeEventListener('popstate', fixLocalhostRedirect)
-      window.removeEventListener('hashchange', fixLocalhostRedirect)
-      history.pushState = originalPushState
-      history.replaceState = originalReplaceState
-    }
-  }, [])
-
   useEffect(() => {
     initialize().catch(() => {
       setTimeout(() => {
@@ -124,4 +80,3 @@ function App() {
 }
 
 export default App
-

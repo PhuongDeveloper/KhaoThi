@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
@@ -7,26 +7,37 @@ import Loader from '../../components/Loader'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [justLoggedIn, setJustLoggedIn] = useState(false)
   const { signIn, loading, profile } = useAuthStore()
   const navigate = useNavigate()
 
-  // Khi đăng nhập thành công, chờ profile cập nhật rồi tự redirect
-  useEffect(() => {
-    if (justLoggedIn && profile) {
-      toast.success('Đăng nhập thành công', { id: 'login-success' })
-      const role = profile.role
-      if (role === 'admin') navigate('/admin', { replace: true })
-      else if (role === 'teacher') navigate('/teacher', { replace: true })
-      else navigate('/student', { replace: true })
+  // Nếu đã đăng nhập rồi (ví dụ quay lại /login bằng tay), redirect ngay
+  if (profile) {
+    const role = profile.role
+    if (role === 'admin') {
+      navigate('/admin', { replace: true })
+      return null
+    } else if (role === 'teacher') {
+      navigate('/teacher', { replace: true })
+      return null
+    } else {
+      navigate('/student', { replace: true })
+      return null
     }
-  }, [justLoggedIn, profile, navigate])
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      await signIn(email, password)
-      setJustLoggedIn(true)
+      const result = await signIn(email, password)
+      // signIn đã set profile vào store, lấy profile từ kết quả trả về
+      const userProfile = result?.profile || useAuthStore.getState().profile
+      if (userProfile) {
+        toast.success('Đăng nhập thành công', { id: 'login-success' })
+        const role = userProfile.role
+        if (role === 'admin') navigate('/admin', { replace: true })
+        else if (role === 'teacher') navigate('/teacher', { replace: true })
+        else navigate('/student', { replace: true })
+      }
     } catch (error: any) {
       toast.error(error.message || 'Đăng nhập thất bại')
     }
