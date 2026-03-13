@@ -7,8 +7,6 @@ import {
   addDoc,
   query,
   where,
-  orderBy,
-  limit,
   Timestamp,
 } from 'firebase/firestore'
 
@@ -424,13 +422,18 @@ export async function getStudentPracticeSessions(studentId: string): Promise<Pra
   const snap = await getDocs(
     query(
       collection(db, 'ai_practice_sessions'),
-      where('student_id', '==', studentId),
-      orderBy('created_at', 'desc'),
-      limit(20)
+      where('student_id', '==', studentId)
     )
   )
 
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as PracticeSession))
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() } as PracticeSession))
+    .sort((a, b) => {
+      const tA = a.created_at?.toDate?.() || new Date(a.created_at)
+      const tB = b.created_at?.toDate?.() || new Date(b.created_at)
+      return tB.getTime() - tA.getTime()
+    })
+    .slice(0, 20)
 }
 
 // ============================================================
