@@ -264,8 +264,8 @@ export async function generatePracticeFromWrongAnswers(
 
   if (filtered.length === 0) return null
 
-  // Lấy tối đa 5 câu sai để làm cơ sở
-  const sampleWrong = filtered.slice(0, 5)
+  // Lấy tối đa 10 câu sai để làm cơ sở
+  const sampleWrong = filtered.slice(0, 10)
   const subjectName = sampleWrong[0].subjectName
   const subjectId = sampleWrong[0].subjectId
 
@@ -273,20 +273,24 @@ export async function generatePracticeFromWrongAnswers(
     `${i + 1}. Câu hỏi gốc: "${w.questionContent}"\n   Đáp án đúng: "${w.correctAnswer}"\n   Học sinh trả lời: "${w.studentAnswer}"\n   Môn: ${w.subjectName}`
   ).join('\n\n')
 
-  const prompt = `Bạn là giáo viên AI. Học sinh đã làm sai các câu hỏi sau. Hãy phân tích chủ đề của từng câu sai, sau đó tạo 5 câu hỏi luyện tập MỚI có liên quan đến các chủ đề đó để giúp học sinh ôn lại.
+  const prompt = `Bạn là giáo viên AI. Học sinh đã làm sai các câu hỏi sau. Nhiệm vụ của bạn là tạo 10 câu hỏi luyện tập MỚI để giúp học sinh ôn lại.
 
 CÂU HỎI HỌC SINH LÀM SAI:
 ${wrongQuestionsText}
 
-YÊU CẦU:
-1. Xác định chủ đề chính từ các câu sai
-2. Tạo 5 câu hỏi trắc nghiệm (4 đáp án, 1 đáp án đúng) liên quan đến các chủ đề đó
-3. Câu hỏi phải ở mức độ tương tự hoặc DỄ HƠN một chút để học sinh có thể hiểu và làm được
+QUY TẮC TẠO CÂU HỎI (RẤT QUAN TRỌNG):
+1. Đa số câu hỏi (7-8/10 câu) phải RẤT TƯƠNG TỰ với câu gốc mà học sinh làm sai:
+   - Cùng dạng bài, cùng cách hỏi, chỉ thay đổi số liệu/tên/chi tiết nhỏ
+   - Ví dụ: nếu câu gốc hỏi về số NST trong giảm phân, câu mới cũng hỏi về số NST nhưng với loài khác
+   - Ví dụ: nếu câu gốc hỏi về công thức hóa học, câu mới hỏi về công thức tương tự
+2. Còn lại 2-3 câu có thể mở rộng sang kiến thức liên quan gần nhất
+3. Tạo đúng 10 câu hỏi trắc nghiệm (4 đáp án, 1 đáp án đúng)
 4. Mỗi câu có giải thích ngắn gọn cho đáp án đúng
+5. Không dùng emoji
 
 Trả về JSON:
 {
-  "topic": "Tên chủ đề chung (ví dụ: Giảm phân và nguyên phân)",
+  "topic": "Tên chủ đề chung",
   "questions": [
     {
       "content": "Nội dung câu hỏi",
@@ -395,9 +399,9 @@ export async function submitPracticeSession(
   // Tạo nhận xét AI
   let feedback = ''
   if (passed) {
-    feedback = `🎉 Tuyệt vời! Em đã đạt ${score}/${total} câu đúng (${scoreOutOf10}/10 điểm). Em đã nắm vững chủ đề "${session.topic}" rồi! Hãy tiếp tục phát huy nhé!`
+    feedback = `Tuyệt vời! Em đã đạt ${score}/${total} câu đúng (${scoreOutOf10}/10 điểm). Em đã nắm vững chủ đề "${session.topic}". Hãy tiếp tục phát huy!`
   } else {
-    feedback = `📚 Em đạt ${score}/${total} câu đúng (${scoreOutOf10}/10 điểm) cho chủ đề "${session.topic}". Cần ôn thêm một chút nữa. Hãy xem lại các câu sai và thử lại nhé!`
+    feedback = `Em đạt ${score}/${total} câu đúng (${scoreOutOf10}/10 điểm) cho chủ đề "${session.topic}". Cần ôn thêm một chút nữa. Hãy thử lại với bộ câu hỏi mới!`
   }
 
   // Cập nhật Firestore
