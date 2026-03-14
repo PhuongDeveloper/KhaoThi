@@ -184,7 +184,7 @@ export const useAuthStore = create<AuthState>()(
           return null
         }
 
-        const currentProfile = get().profile
+
 
         try {
           const profilesCol = collection(db, 'profiles')
@@ -258,32 +258,16 @@ export const useAuthStore = create<AuthState>()(
             set({ profile })
             return profile
           }
-        } catch (error: any) {
-          console.error('[AuthStore] Lỗi khi fetch/create profile:', error)
-          // Nếu có lỗi nhưng đã có profile trong state, trả về profile đó
-          if (currentProfile) {
-            console.log('[AuthStore] Sử dụng profile từ cache')
-            return currentProfile
-          }
-          // Nếu không có profile và có lỗi, throw error để UI biết
-          throw new Error(`Không thể tạo/tải profile: ${error.message || 'Unknown error'}`)
+        } catch (error) {
+          console.error('[AuthStore] Lỗi khi tạo/fetch profile:', error)
+          set({ profile: null })
+          throw error
         }
       },
     }),
     {
-      name: 'auth-storage', // Tên key trong localStorage
-      partialize: (state) => ({
-        // Lưu profile và thông tin user cơ bản để UI có thể render ngay lập tức
-        // Firebase Auth sẽ vẫn là nguồn trung thực tuyệt đối sau khi khởi tạo xong
-        profile: state.profile,
-        user: state.user ? {
-          uid: state.user.uid,
-          email: state.user.email,
-          displayName: state.user.displayName,
-          photoURL: state.user.photoURL,
-        } as FirebaseUser : null,
-      }),
+      name: 'khao-thi-auth-v2', // Changed to force a fresh login state
+      partialize: (state) => ({ profile: state.profile }),
     }
   )
 )
-

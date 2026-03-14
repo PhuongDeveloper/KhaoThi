@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import Loader from '../../components/Loader'
@@ -8,20 +8,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const { signIn, loading, profile } = useAuthStore()
-  const navigate = useNavigate()
 
   // Nếu đã đăng nhập rồi (ví dụ quay lại /login bằng tay), redirect ngay
   if (profile) {
     const role = profile.role
     if (role === 'admin') {
-      navigate('/admin', { replace: true })
-      return null
+      return <Navigate to="/admin" replace />
     } else if (role === 'teacher') {
-      navigate('/teacher', { replace: true })
-      return null
+      return <Navigate to="/teacher" replace />
     } else {
-      navigate('/student', { replace: true })
-      return null
+      return <Navigate to="/student" replace />
     }
   }
 
