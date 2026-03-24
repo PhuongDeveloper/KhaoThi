@@ -63,10 +63,12 @@ export type Database = {
           id: string
           exam_id: string
           content: string
-          question_type: 'multiple_choice' | 'true_false'
+          question_type: 'multiple_choice' | 'true_false' | 'true_false_multi' | 'short_answer'
           difficulty: 'easy' | 'medium' | 'hard'
           points: number
           order_index: number | null
+          correct_answer: string | null
+          image_url: string | null
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['questions']['Row'], 'id' | 'created_at'>

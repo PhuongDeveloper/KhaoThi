@@ -101,7 +101,6 @@ export default function StudentGrades() {
         name: `Lần ${idx + 1}`,
         date: new Date(attempt.created_at).toLocaleDateString('vi-VN'),
         score: parseFloat(attempt.score) || 0,
-        percentage: attempt.percentage || 0,
         totalScore: attempt.exam?.total_score || 10
       }))
   }
@@ -218,10 +217,10 @@ export default function StudentGrades() {
                 <CheckCircle className="h-5 w-5 text-gray-500" />
               </div>
               <p className="text-3xl font-semibold text-gray-900">
-                {stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0}%
+                {stats.passed}/{stats.total}
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                {stats.passed}/{stats.total} bài
+                bài đạt
               </p>
             </div>
           </div>
@@ -238,7 +237,7 @@ export default function StudentGrades() {
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="name" stroke="#6b7280" />
-                    <YAxis domain={[0, 100]} stroke="#6b7280" />
+                    <YAxis domain={[0, 'auto']} stroke="#6b7280" />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: '#fff',
@@ -248,10 +247,10 @@ export default function StudentGrades() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="percentage"
+                      dataKey="score"
                       stroke="#4b5563"
                       strokeWidth={2}
-                      name="Điểm (%)"
+                      name="Điểm"
                       dot={{ fill: '#4b5563', r: 4 }}
                     />
                   </LineChart>
@@ -334,9 +333,6 @@ export default function StudentGrades() {
                       Điểm số
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Tỷ lệ
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
                       Ngày làm
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
@@ -350,7 +346,7 @@ export default function StudentGrades() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {getSubjectAttempts(selectedSubject).length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                       <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                         Chưa có bài thi nào
                       </td>
                     </tr>
@@ -366,9 +362,6 @@ export default function StudentGrades() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                             {attempt.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                            {/* Điểm đầy đủ */}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {new Date(attempt.created_at).toLocaleDateString('vi-VN')}

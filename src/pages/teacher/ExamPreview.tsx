@@ -4,6 +4,7 @@ import { examApi } from '../../lib/api/exams'
 import toast from 'react-hot-toast'
 import { Clock, CheckCircle, ChevronLeft, ChevronRight, X, Eye } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import MathContent from '../../components/MathContent'
 
 export default function ExamPreview() {
   const { id } = useParams()
@@ -216,10 +217,10 @@ export default function ExamPreview() {
           }
         })
 
-        const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0
-        setScore(percentage)
+        const actualScore = maxScore > 0 ? (totalScore / maxScore) * (exam?.total_score || 10) : 0
+        setScore(actualScore)
         setSubmitted(true)
-        toast.success(`Nộp bài thành công! Điểm: ${percentage}%`)
+        toast.success(`Nộp bài thành công! Điểm: ${actualScore.toFixed(2)}/${exam?.total_score || 10}`)
       }
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi nộp bài')
@@ -293,7 +294,7 @@ export default function ExamPreview() {
                   <p className="text-xs text-gray-500">
                     Câu {currentQuestionIndex + 1}/{questions.length} • Đã làm: {answeredCount}/{questions.length}
                     {submitted && score !== null && (
-                      <span className="ml-2 text-green-600 font-semibold">• Điểm: {score}%</span>
+                      <span className="ml-2 text-green-600 font-semibold">• Điểm: {typeof score === 'number' ? score.toFixed(2) : score}/{exam?.total_score || 10}</span>
                     )}
                   </p>
                 </div>
@@ -379,7 +380,7 @@ export default function ExamPreview() {
                 {/* Question Content */}
                 <div className="p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed whitespace-pre-wrap">
-                    {currentQuestion.content}
+                    <MathContent content={currentQuestion.content} />
                   </h2>
 
                   {/* Image */}
@@ -432,7 +433,7 @@ export default function ExamPreview() {
                               disabled={submitted}
                               className="sr-only"
                             />
-                            <span className="text-gray-900 flex-1 leading-relaxed">{answer.content}</span>
+                            <span className="text-gray-900 flex-1 leading-relaxed"><MathContent content={answer.content} /></span>
                             {showResult && isCorrect && (
                               <span className="ml-2 text-green-600 font-semibold">✓ Đúng</span>
                             )}
@@ -465,7 +466,7 @@ export default function ExamPreview() {
                                 <span className="font-semibold text-blue-600 mr-3 mt-1 min-w-[24px]">
                                   {String.fromCharCode(97 + idx)}.
                                 </span>
-                                <span className="text-gray-900 flex-1 leading-relaxed">{answer.content}</span>
+                                <span className="text-gray-900 flex-1 leading-relaxed"><MathContent content={answer.content} /></span>
                               </div>
                               <div className="flex items-center space-x-3 ml-4">
                                 <label className={`flex items-center cursor-pointer px-4 py-2 rounded-lg transition-all ${selected === 'true'
@@ -607,7 +608,7 @@ export default function ExamPreview() {
                 <p className="text-xs text-gray-500 mt-1">
                   {answeredCount}/{questions.length} câu đã làm
                   {submitted && score !== null && (
-                    <span className="block mt-1 text-green-600 font-semibold">Điểm: {score}%</span>
+                    <span className="block mt-1 text-green-600 font-semibold">Điểm: {typeof score === 'number' ? score.toFixed(2) : score}/{exam?.total_score || 10}</span>
                   )}
                 </p>
               </div>

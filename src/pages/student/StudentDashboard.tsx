@@ -297,12 +297,11 @@ export default function StudentDashboard() {
         <div className="bg-white border border-gray-200 rounded-lg p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Tỷ lệ hoàn thành</p>
+              <p className="text-sm text-gray-600 mb-1">Hoàn thành</p>
               <p className="text-3xl font-semibold text-gray-900">
-                {publishedExams.length > 0 
-                  ? Math.round((completedCount / publishedExams.length) * 100) 
-                  : 0}%
+                {completedCount}/{publishedExams.length}
               </p>
+              <p className="text-xs text-gray-500 mt-1">bài</p>
             </div>
             <div className="p-3 bg-gray-100 rounded-lg">
               <TrendingUp className="h-6 w-6 text-gray-600" />

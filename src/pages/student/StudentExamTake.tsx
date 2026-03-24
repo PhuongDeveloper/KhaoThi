@@ -8,6 +8,7 @@ import {
   FileText, Maximize2, LayoutList, AlignJustify
 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import MathContent from '../../components/MathContent'
 
 type ViewMode = 'single' | 'all'
 
@@ -414,7 +415,7 @@ export default function StudentExamTake() {
 
         {/* Question Content */}
         <div className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed whitespace-pre-wrap">{question.content}</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6 leading-relaxed whitespace-pre-wrap"><MathContent content={question.content} /></h2>
           {question.image_url && (
             <div className="mb-6 flex justify-center bg-gray-50 p-4 rounded-xl border-2 border-gray-200">
               <img src={question.image_url} alt="Question" className="max-w-full max-h-[400px] rounded-lg shadow-md object-contain" />
@@ -439,7 +440,7 @@ export default function StudentExamTake() {
                     checked={selectedAnswers[question.id] === answer.id}
                     onChange={() => handleAnswerSelect(question.id, answer.id)}
                     className="sr-only" />
-                  <span className="text-gray-900 flex-1 leading-relaxed">{answer.content}</span>
+                  <span className="text-gray-900 flex-1 leading-relaxed"><MathContent content={answer.content} /></span>
                 </label>
               ))}
             </div>
@@ -453,7 +454,7 @@ export default function StudentExamTake() {
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-start flex-1">
                       <span className="font-bold text-primary-600 mr-3 mt-0.5 min-w-[24px]">{String.fromCharCode(97 + aidx)}.</span>
-                      <span className="text-gray-900 flex-1 leading-relaxed">{answer.content}</span>
+                      <span className="text-gray-900 flex-1 leading-relaxed"><MathContent content={answer.content} /></span>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <label className={`flex items-center cursor-pointer px-4 py-2 rounded-lg transition-all font-semibold text-sm select-none ${selectedAnswers[`${question.id}-${answer.id}`] === 'true'

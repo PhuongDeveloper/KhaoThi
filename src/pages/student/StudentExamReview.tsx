@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
 import { CheckCircle, XCircle, ArrowLeft, Clock, AlertCircle } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import MathContent from '../../components/MathContent'
 
 export default function StudentExamReview() {
   const { id } = useParams()
@@ -332,7 +333,7 @@ export default function StudentExamReview() {
 
               {/* Question Content */}
               <div className="p-6">
-                <p className="text-lg font-semibold text-gray-900 mb-4 whitespace-pre-wrap">{question.content}</p>
+                <p className="text-lg font-semibold text-gray-900 mb-4 whitespace-pre-wrap"><MathContent content={question.content} /></p>
 
                 {/* Image */}
                 {question.image_url && (
@@ -372,7 +373,7 @@ export default function StudentExamReview() {
                               }`}>
                               {String.fromCharCode(65 + aidx)}
                             </div>
-                            <span className="flex-1 text-gray-900">{answer.content}</span>
+                            <span className="flex-1 text-gray-900"><MathContent content={answer.content} /></span>
                             {isCorrectAnswer && (
                               <CheckCircle className="h-5 w-5 text-green-600" />
                             )}
@@ -419,7 +420,7 @@ export default function StudentExamReview() {
                               <span className="font-semibold text-primary-600">
                                 {String.fromCharCode(97 + aidx)}.
                               </span>
-                              <span className="text-gray-900">{answer.content}</span>
+                              <span className="text-gray-900"><MathContent content={answer.content} /></span>
                             </div>
                             <div className="flex items-center space-x-3 ml-4">
                               {/* Đáp án đúng */}

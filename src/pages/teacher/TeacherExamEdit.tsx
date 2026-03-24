@@ -16,12 +16,14 @@ export default function TeacherExamEdit() {
   const basePath = isAdmin ? '/admin' : '/teacher'
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingQuestions, setSavingQuestions] = useState(false)
   const [assigning, setAssigning] = useState(false)
   const [showAnswers, setShowAnswers] = useState(false)
   const [subjects, setSubjects] = useState<any[]>([])
   const [classes, setClasses] = useState<any[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string>('')
   const [examStats, setExamStats] = useState({ totalQuestions: 0, mcCount: 0, tfCount: 0, saCount: 0 })
+  const [questions, setQuestions] = useState<any[]>([])
   const [formData, setFormData] = useState({
     title: '',
     subject_id: '',
@@ -70,6 +72,7 @@ export default function TeacherExamEdit() {
         end_time: examData.end_time ? examData.end_time.slice(0, 16) : '',
       })
       if (questionsData) {
+        setQuestions(questionsData)
         const mc = questionsData.filter((q: any) => q.question_type === 'multiple_choice').length
         const tf = questionsData.filter((q: any) => q.question_type === 'true_false_multi').length
         const sa = questionsData.filter((q: any) => q.question_type === 'short_answer').length
@@ -124,6 +127,32 @@ export default function TeacherExamEdit() {
       toast.error(error.message || 'Lỗi khi giao bài thi')
     } finally {
       setAssigning(false)
+    }
+  }
+
+  const handleSaveQuestions = async () => {
+    setSavingQuestions(true)
+    try {
+      for (const q of questions) {
+        await examApi.updateQuestion(q.id, {
+          content: q.content,
+          correct_answer: q.correct_answer || null,
+          image_url: q.image_url || null,
+        })
+        if (q.answers) {
+          for (const a of q.answers) {
+            await examApi.updateAnswer(a.id, {
+              content: a.content,
+              is_correct: a.is_correct,
+            })
+          }
+        }
+      }
+      toast.success('Cập nhật câu hỏi thành công')
+    } catch (error: any) {
+      toast.error(error.message || 'Lỗi khi cập nhật câu hỏi')
+    } finally {
+      setSavingQuestions(false)
     }
   }
 
@@ -377,6 +406,179 @@ export default function TeacherExamEdit() {
           )}
         </div>
       </div>
+
+      {/* ============ PHẦN CHỈNH SỬA CÂU HỎI ============ */}
+      {questions.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary-600" />
+              Chỉnh sửa câu hỏi ({questions.length} câu)
+            </h2>
+            <button
+              onClick={handleSaveQuestions}
+              disabled={savingQuestions}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <Save className="h-4 w-4" />
+              {savingQuestions ? 'Đang lưu câu hỏi...' : 'Lưu câu hỏi'}
+            </button>
+          </div>
+
+          {questions.map((q, qIdx) => (
+            <div key={q.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              {/* Question header */}
+              <div className={`px-5 py-3 border-b border-gray-200 flex items-center justify-between ${
+                q.question_type === 'multiple_choice' ? 'bg-blue-50' :
+                q.question_type === 'true_false_multi' ? 'bg-green-50' : 'bg-purple-50'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <span className="bg-white text-gray-700 text-xs font-bold px-2.5 py-1 rounded-lg shadow-sm">
+                    Câu {qIdx + 1}
+                  </span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    q.question_type === 'multiple_choice' ? 'bg-blue-100 text-blue-700' :
+                    q.question_type === 'true_false_multi' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {q.question_type === 'multiple_choice' ? 'Trắc nghiệm' :
+                     q.question_type === 'true_false_multi' ? 'Đúng/Sai' : 'Trả lời ngắn'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {/* Nội dung câu hỏi */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Nội dung câu hỏi</label>
+                  <textarea
+                    rows={3}
+                    value={q.content}
+                    onChange={(e) => {
+                      const updated = [...questions]
+                      updated[qIdx] = { ...updated[qIdx], content: e.target.value }
+                      setQuestions(updated)
+                    }}
+                    className="input whitespace-pre-wrap text-sm"
+                  />
+                </div>
+
+                {/* Hình ảnh */}
+                {q.image_url && (
+                  <div className="flex items-center gap-3">
+                    <img src={q.image_url} alt="" className="h-20 rounded-lg border" />
+                    <input
+                      type="text"
+                      value={q.image_url || ''}
+                      onChange={(e) => {
+                        const updated = [...questions]
+                        updated[qIdx] = { ...updated[qIdx], image_url: e.target.value }
+                        setQuestions(updated)
+                      }}
+                      className="input text-xs flex-1"
+                      placeholder="URL hình ảnh"
+                    />
+                  </div>
+                )}
+
+                {/* Multiple Choice answers */}
+                {q.question_type === 'multiple_choice' && q.answers && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-gray-500">Đáp án (chọn đáp án đúng)</label>
+                    {q.answers.map((a: any, aIdx: number) => (
+                      <div key={a.id} className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                        a.is_correct ? 'border-green-400 bg-green-50' : 'border-gray-200'
+                      }`}>
+                        <input
+                          type="radio"
+                          name={`correct-${q.id}`}
+                          checked={a.is_correct}
+                          onChange={() => {
+                            const updated = [...questions]
+                            updated[qIdx].answers = updated[qIdx].answers.map((ans: any, i: number) => ({
+                              ...ans, is_correct: i === aIdx
+                            }))
+                            setQuestions(updated)
+                          }}
+                          className="w-4 h-4 text-green-600"
+                        />
+                        <span className="text-sm font-bold text-gray-500 w-6">{String.fromCharCode(65 + aIdx)}.</span>
+                        <input
+                          type="text"
+                          value={a.content}
+                          onChange={(e) => {
+                            const updated = [...questions]
+                            updated[qIdx].answers[aIdx] = { ...updated[qIdx].answers[aIdx], content: e.target.value }
+                            setQuestions(updated)
+                          }}
+                          className="input text-sm flex-1"
+                        />
+                        {a.is_correct && <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* True/False Multi answers */}
+                {q.question_type === 'true_false_multi' && q.answers && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-gray-500">Các ý (đánh dấu Đúng/Sai)</label>
+                    {q.answers.map((a: any, aIdx: number) => (
+                      <div key={a.id} className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                        a.is_correct ? 'border-green-400 bg-green-50' : 'border-red-200 bg-red-50/30'
+                      }`}>
+                        <span className="text-sm font-bold text-gray-500 w-6">{String.fromCharCode(97 + aIdx)}.</span>
+                        <input
+                          type="text"
+                          value={a.content}
+                          onChange={(e) => {
+                            const updated = [...questions]
+                            updated[qIdx].answers[aIdx] = { ...updated[qIdx].answers[aIdx], content: e.target.value }
+                            setQuestions(updated)
+                          }}
+                          className="input text-sm flex-1"
+                        />
+                        <label className={`flex items-center gap-1 px-3 py-1 rounded-lg cursor-pointer text-xs font-semibold transition-all ${
+                          a.is_correct ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={a.is_correct}
+                            onChange={(e) => {
+                              const updated = [...questions]
+                              updated[qIdx].answers[aIdx] = { ...updated[qIdx].answers[aIdx], is_correct: e.target.checked }
+                              setQuestions(updated)
+                            }}
+                            className="sr-only"
+                          />
+                          {a.is_correct ? 'Đúng' : 'Sai'}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Short answer */}
+                {q.question_type === 'short_answer' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Đáp án đúng</label>
+                    <input
+                      type="text"
+                      value={q.correct_answer || ''}
+                      onChange={(e) => {
+                        const updated = [...questions]
+                        updated[qIdx] = { ...updated[qIdx], correct_answer: e.target.value }
+                        setQuestions(updated)
+                      }}
+                      className="input text-sm"
+                      placeholder="Nhập đáp án đúng"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Bottom action bar */}
       <div className="flex justify-end gap-3 bg-white border border-gray-200 rounded-xl p-4 shadow-sm">

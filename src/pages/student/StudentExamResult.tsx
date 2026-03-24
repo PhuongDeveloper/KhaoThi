@@ -107,7 +107,7 @@ export default function StudentExamResult() {
             {attempt?.score != null ? Number(attempt.score).toFixed(2) : '0'}/{exam?.total_score || 10} điểm
           </p>
           <p className="text-gray-600">
-            Điểm đạt: {exam?.passing_score}%
+            Điểm đạt: {((exam?.passing_score || 50) / 100 * (exam?.total_score || 10)).toFixed(1)}/{exam?.total_score || 10}
           </p>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore'
 import toast from 'react-hot-toast'
 import { CheckCircle, XCircle, ArrowLeft, User } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
+import MathContent from '../../components/MathContent'
 
 export default function StudentExamDetail() {
   const { id, attemptId } = useParams()
@@ -194,7 +195,7 @@ export default function StudentExamDetail() {
 
               {/* Question Content */}
               <div className="p-6">
-                <p className="text-lg font-semibold text-gray-900 mb-4 whitespace-pre-wrap">{question.content}</p>
+                <p className="text-lg font-semibold text-gray-900 mb-4 whitespace-pre-wrap"><MathContent content={question.content} /></p>
 
                 {/* Image */}
                 {question.image_url && (
@@ -234,7 +235,7 @@ export default function StudentExamDetail() {
                               }`}>
                               {String.fromCharCode(65 + aidx)}
                             </div>
-                            <span className="flex-1 text-gray-900">{answer.content}</span>
+                            <span className="flex-1 text-gray-900"><MathContent content={answer.content} /></span>
                             {isCorrectAnswer && (
                               <div className="flex items-center text-green-600">
                                 <CheckCircle className="h-5 w-5 mr-1" />
@@ -287,7 +288,7 @@ export default function StudentExamDetail() {
                               <span className="font-semibold text-blue-600">
                                 {String.fromCharCode(97 + aidx)}.
                               </span>
-                              <span className="text-gray-900">{answer.content}</span>
+                              <span className="text-gray-900"><MathContent content={answer.content} /></span>
                             </div>
                             <div className="flex items-center space-x-3 ml-4">
                               {/* Đáp án đúng */}

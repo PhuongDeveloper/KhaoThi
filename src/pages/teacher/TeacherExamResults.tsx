@@ -80,7 +80,6 @@ export default function TeacherExamResults() {
           'Hạng': idx + 1,
           'Họ tên': (a.student as any)?.full_name || '-',
           'Điểm': `${a.score || 0}/${exam?.total_score || 10}`,
-          'Tỉ lệ (%)': a.percentage || 0,
           'Thời gian làm': a.time_spent_seconds ? `${Math.floor(a.time_spent_seconds / 60)}:${String(a.time_spent_seconds % 60).padStart(2, '0')}` : '-',
           'Vi phạm': a.violations_count || 0,
           'Trạng thái': a.status === 'submitted' ? 'Đã nộp' : a.status === 'violation' ? 'Vi phạm' : 'Timeout',
@@ -149,7 +148,7 @@ export default function TeacherExamResults() {
         {[
           { label: 'Học sinh nộp bài', value: submittedAttempts.length, icon: Users, color: 'text-blue-600 bg-blue-50' },
           { label: 'Điểm trung bình', value: `${avgScore.toFixed(2)}/${totalScore}`, icon: TrendingUp, color: 'text-purple-600 bg-purple-50' },
-          { label: 'Tỷ lệ đạt', value: `${submittedAttempts.length ? Math.round(passCount / submittedAttempts.length * 100) : 0}%`, icon: Trophy, color: 'text-green-600 bg-green-50' },
+          { label: 'Số bài đạt', value: `${passCount}/${submittedAttempts.length}`, icon: Trophy, color: 'text-green-600 bg-green-50' },
           { label: 'Điểm cao nhất', value: `${Number(highestScore).toFixed(2)}/${totalScore}`, icon: Trophy, color: 'text-yellow-600 bg-yellow-50' },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="bg-white border border-gray-200 rounded-xl p-5">
