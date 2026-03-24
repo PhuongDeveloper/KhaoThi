@@ -33,7 +33,7 @@ interface Profile {
 
 interface AuthState {
   user: FirebaseUser | null
-  // Firebase không có Session như Supabase, giữ kiểu cho tương thích nhưng không dùng
+  // Giữ kiểu session cho tương thích nhưng không dùng
   session: any | null
   profile: Profile | null
   loading: boolean

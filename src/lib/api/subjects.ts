@@ -1,5 +1,5 @@
 import { db } from '../firebase'
-import type { Database } from '../supabase'
+import type { Database } from '../types'
 import {
   collection,
   doc,

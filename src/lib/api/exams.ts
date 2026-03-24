@@ -1,4 +1,4 @@
-import type { Database } from '../supabase'
+import type { Database } from '../types'
 import { cache, CACHE_KEYS } from '../cache'
 import {
   addDoc,
@@ -42,12 +42,13 @@ function normalizeId<T extends { id: string }>(docId: string, data: any): T {
 
 export const examApi = {
   // Exams
-  async getExams(filters?: { status?: string; subjectId?: string }) {
+  async getExams(filters?: { status?: string; subjectId?: string; teacherId?: string }) {
     const examsCol = collection(db, 'exams')
     // Tránh composite index: nếu có filter thì bỏ orderBy trong query, sort ở client
-    const hasFilters = !!(filters?.status || filters?.subjectId)
+    const hasFilters = !!(filters?.status || filters?.subjectId || filters?.teacherId)
     const constraints: any[] = []
 
+    if (filters?.teacherId) constraints.push(where('teacher_id', '==', filters.teacherId))
     if (filters?.status) constraints.push(where('status', '==', filters.status))
     if (filters?.subjectId) constraints.push(where('subject_id', '==', filters.subjectId))
 
@@ -910,5 +911,68 @@ export const examApi = {
     }
 
     return result
+  },
+
+  // Clone đề thi cho giáo viên khác (chuyển đề thi nhanh)
+  async cloneExamForTeacher(examId: string, newTeacherId: string) {
+    // 1. Đọc exam gốc
+    const examRef = doc(db, 'exams', examId)
+    const examSnap = await getDoc(examRef)
+    if (!examSnap.exists()) throw new Error('Không tìm thấy đề thi với mã này')
+    const originalExam = examSnap.data() as any
+
+    // 2. Tạo exam mới với teacher_id mới
+    const now = new Date().toISOString()
+    const newExamData = {
+      ...originalExam,
+      teacher_id: newTeacherId,
+      status: 'draft' as const, // Bản sao luôn là nháp
+      created_at: now,
+      updated_at: now,
+    }
+    // Xóa id cũ nếu có trong data
+    delete newExamData.id
+
+    const newExamRef = await addDoc(collection(db, 'exams'), newExamData)
+    const newExamId = newExamRef.id
+
+    // 3. Đọc tất cả questions của exam gốc
+    const questionsSnap = await getDocs(
+      query(collection(db, 'questions'), where('exam_id', '==', examId))
+    )
+
+    // 4. Clone từng question + answers
+    for (const qDoc of questionsSnap.docs) {
+      const qData = qDoc.data() as any
+      const newQData = {
+        ...qData,
+        exam_id: newExamId,
+        created_at: now,
+      }
+      delete newQData.id
+
+      const newQRef = await addDoc(collection(db, 'questions'), newQData)
+
+      // Đọc answers của question gốc
+      const answersSnap = await getDocs(
+        query(collection(db, 'answers'), where('question_id', '==', qDoc.id))
+      )
+
+      // Clone answers
+      for (const aDoc of answersSnap.docs) {
+        const aData = aDoc.data() as any
+        const newAData = {
+          ...aData,
+          question_id: newQRef.id,
+          created_at: now,
+        }
+        delete newAData.id
+        await addDoc(collection(db, 'answers'), newAData)
+      }
+    }
+
+    // 5. Trả về exam mới
+    const newExamSnap = await getDoc(newExamRef)
+    return normalizeId<Exam>(newExamSnap.id, newExamSnap.data())
   },
 }

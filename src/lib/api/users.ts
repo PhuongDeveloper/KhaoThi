@@ -1,5 +1,5 @@
 import { db, firebaseConfig } from '../firebase'
-import type { Database } from '../supabase'
+import type { Database } from '../types'
 import { initializeApp, deleteApp } from 'firebase/app'
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'
 import {
