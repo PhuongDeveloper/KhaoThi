@@ -21,13 +21,17 @@ export default function TeacherDashboard() {
 
   const fetchData = async () => {
     try {
-      const exams = await examApi.getExams()
-      const attempts = await examApi.getAttempts()
+      if (!profile?.id) return;
 
-      const myExams = exams.filter((e: any) => e.teacher_id === profile?.id)
-      const myAttempts = attempts.filter((a: any) => {
-        return myExams.some((e: any) => e.id === a.exam_id)
-      })
+      // Lấy chỉ bài thi của giáo viên này
+      const myExams = await examApi.getExams({ teacherId: profile.id })
+      
+      // Lấy danh sách lượt làm bài của từng bài thi
+      const attemptsPromises = myExams.map(exam => examApi.getAttempts(exam.id))
+      const attemptsResults = await Promise.all(attemptsPromises)
+      
+      // Gộp list attempts lại
+      const myAttempts = attemptsResults.flat()
 
       setStats({
         totalExams: myExams.length,
@@ -37,12 +41,11 @@ export default function TeacherDashboard() {
 
       setRecentExams(myExams.slice(0, 5))
     } catch (error) {
-      // Ignore errors
+      console.error('Error fetching dashboard data:', error)
     } finally {
       setLoading(false)
     }
   }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -102,8 +105,8 @@ export default function TeacherDashboard() {
         <div className="border-b border-gray-200 px-6 py-4">
           <div className="flex justify-between items-center">
             <h2 className="text-lg font-semibold text-gray-900">Bài thi gần đây</h2>
-            <Link 
-              to="/teacher/exams" 
+            <Link
+              to="/teacher/exams"
               className="text-sm text-gray-600 hover:text-gray-900 flex items-center"
             >
               Xem tất cả
@@ -133,11 +136,10 @@ export default function TeacherDashboard() {
                     </p>
                   </div>
                   <span
-                    className={`ml-4 px-2.5 py-1 text-xs font-medium rounded ${
-                      exam.status === 'published'
+                    className={`ml-4 px-2.5 py-1 text-xs font-medium rounded ${exam.status === 'published'
                         ? 'bg-gray-100 text-gray-700'
                         : 'bg-gray-50 text-gray-600'
-                    }`}
+                      }`}
                   >
                     {exam.status === 'published' ? 'Đã xuất bản' : 'Nháp'}
                   </span>

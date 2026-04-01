@@ -151,18 +151,24 @@ export const examApi = {
   },
 
   async updateExam(id: string, exam: Database['public']['Tables']['exams']['Update']) {
-    const examData = {
+    const examData: any = {
       ...exam,
-      // Không cho Firestore nhận undefined
-      subject_id: exam.subject_id ?? null,
-      teacher_id: exam.teacher_id ?? null,
-      start_time: (exam.start_time === '' || exam.start_time === null || exam.start_time === undefined) ? null : exam.start_time,
-      end_time: (exam.end_time === '' || exam.end_time === null || exam.end_time === undefined) ? null : exam.end_time,
       updated_at: new Date().toISOString(),
     }
 
+    // Xử lý các chuỗi rỗng thành null nếu có truyền vào
+    if (examData.start_time === '') examData.start_time = null;
+    if (examData.end_time === '') examData.end_time = null;
+
+    // Loại bỏ các trường undefined để Firestore không báo lỗi và không ghi đè dữ liệu
+    Object.keys(examData).forEach(key => {
+      if (examData[key] === undefined) {
+        delete examData[key];
+      }
+    });
+
     const examRef = doc(db, 'exams', id)
-    await updateDoc(examRef, examData as any)
+    await updateDoc(examRef, examData)
     const snap = await getDoc(examRef)
     return normalizeId<Exam>(snap.id, snap.data())
   },
