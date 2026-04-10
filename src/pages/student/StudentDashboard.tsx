@@ -120,12 +120,12 @@ export default function StudentDashboard() {
       const attemptsPromise = fetchWithTimeout(examApi.getAttempts(undefined, true)).catch(() => [])
 
       assignmentsPromise.then((assignments) => {
-        setAssignedExams((assignments || []).slice(0, 5))
+        setAssignedExams(assignments || [])
         setLoading(false)
       })
 
       attemptsPromise.then((attempts) => {
-        setRecentAttempts((attempts || []).slice(0, 5))
+        setRecentAttempts(attempts || [])
       })
 
       await Promise.allSettled([assignmentsPromise, attemptsPromise])

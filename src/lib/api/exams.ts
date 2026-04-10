@@ -670,12 +670,8 @@ export const examApi = {
         const studentChoice = textAnswer === 'true'
         const correctAnswer = answer.is_correct === true
         isCorrect = studentChoice === correctAnswer
-
-        const qAnsSnap = await getDocs(
-          query(collection(db, 'answers'), where('question_id', '==', questionId))
-        )
-        const answersCount = qAnsSnap.size || 1
-        pointsEarned = isCorrect ? pointsPerQuestion / answersCount : 0
+        // pointsEarned sẽ được tính lại sau khi lưu response (xem phần recalc bên dưới)
+        pointsEarned = 0
       }
     } else if (answerId) {
       const ansSnap = await getDoc(doc(db, 'answers', answerId))
@@ -741,10 +737,8 @@ export const examApi = {
         points_earned: pointsEarned,
         answered_at: new Date().toISOString(),
       } as any)
-      const snap = await getDoc(respRef)
-      return normalizeId<ExamResponse>(snap.id, snap.data())
     } else {
-      const ref = await addDoc(collection(db, 'exam_responses'), {
+      await addDoc(collection(db, 'exam_responses'), {
         attempt_id: attemptId,
         question_id: questionId,
         answer_id: answerId,
@@ -753,9 +747,108 @@ export const examApi = {
         points_earned: pointsEarned,
         answered_at: new Date().toISOString(),
       } as Database['public']['Tables']['exam_responses']['Insert'])
-      const snap = await getDoc(ref)
-      return normalizeId<ExamResponse>(snap.id, snap.data())
     }
+
+    // === RECALC: Tính lại điểm toàn bộ câu Đúng/Sai theo chuẩn Bộ GD&ĐT ===
+    if (question.question_type === 'true_false_multi') {
+      // Lấy tổng số ý (statements) của câu hỏi
+      const allAnswersSnap = await getDocs(
+        query(collection(db, 'answers'), where('question_id', '==', questionId))
+      )
+      const totalStatements = allAnswersSnap.size || 4
+
+      // Lấy tất cả responses cho câu này trong lần thi này
+      const allResponsesSnap = await getDocs(
+        query(
+          collection(db, 'exam_responses'),
+          where('attempt_id', '==', attemptId),
+          where('question_id', '==', questionId)
+        )
+      )
+      const allResponses = allResponsesSnap.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      })) as any[]
+
+      // Đếm số ý đúng
+      const correctCount = allResponses.filter(r => r.is_correct === true).length
+
+      // Bảng điểm theo chuẩn Bộ GD&ĐT (dựa trên tỷ lệ sai)
+      // Nếu đã trả lời đủ tất cả ý mới tính điểm theo bảng chuẩn
+      // Nếu chưa trả lời đủ, tạm tính = 0 (chờ đủ rồi mới tính)
+      const answeredCount = allResponses.length
+      const wrongCount = answeredCount - correctCount
+
+      let scoreRatio = 0
+      if (answeredCount >= totalStatements) {
+        // Đã trả lời đủ tất cả ý → tính theo bảng chuẩn
+        if (wrongCount === 0) {
+          scoreRatio = 1.0    // Đúng hết → 100%
+        } else if (wrongCount === 1) {
+          scoreRatio = 0.5    // Sai 1 ý → 50%
+        } else if (wrongCount === 2) {
+          scoreRatio = 0.25   // Sai 2 ý → 25%
+        } else if (wrongCount === 3) {
+          scoreRatio = 0.1    // Sai 3 ý → 10%
+        } else {
+          scoreRatio = 0      // Sai 4 ý → 0%
+        }
+      } else {
+        // Chưa trả lời đủ → tạm tính theo số ý đã trả lời
+        // Giả sử các ý chưa trả lời là sai
+        const totalWrong = wrongCount + (totalStatements - answeredCount)
+        if (totalWrong === 0) {
+          scoreRatio = 1.0
+        } else if (totalWrong === 1) {
+          scoreRatio = 0.5
+        } else if (totalWrong === 2) {
+          scoreRatio = 0.25
+        } else if (totalWrong === 3) {
+          scoreRatio = 0.1
+        } else {
+          scoreRatio = 0
+        }
+      }
+
+      const totalQuestionPoints = pointsPerQuestion * scoreRatio
+      // Chia đều điểm cho tất cả responses để submitExam cộng dồn đúng
+      const pointsPerResponse = answeredCount > 0 ? totalQuestionPoints / answeredCount : 0
+
+      // Cập nhật lại points_earned cho tất cả responses của câu này
+      for (const resp of allResponses) {
+        await updateDoc(doc(db, 'exam_responses', resp.id), {
+          points_earned: pointsPerResponse,
+        } as any)
+      }
+    }
+
+    // Trả về response hiện tại sau khi đã recalc
+    if (question.question_type === 'true_false_multi' && answerId) {
+      const finalSnap = await getDocs(
+        query(
+          collection(db, 'exam_responses'),
+          where('attempt_id', '==', attemptId),
+          where('question_id', '==', questionId),
+          where('answer_id', '==', answerId)
+        )
+      )
+      if (!finalSnap.empty) {
+        return normalizeId<ExamResponse>(finalSnap.docs[0].id, finalSnap.docs[0].data())
+      }
+    }
+
+    // Fallback cho các loại câu khác
+    const fallbackSnap = await getDocs(
+      query(
+        collection(db, 'exam_responses'),
+        where('attempt_id', '==', attemptId),
+        where('question_id', '==', questionId)
+      )
+    )
+    if (!fallbackSnap.empty) {
+      return normalizeId<ExamResponse>(fallbackSnap.docs[0].id, fallbackSnap.docs[0].data())
+    }
+    throw new Error('Response not found after save')
   },
 
   async submitExam(

@@ -10,18 +10,14 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 export default function StudentGrades() {
   const [subjects, setSubjects] = useState<any[]>([])
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
-  const [attempts, setAttempts] = useState<any[]>([])
+  const [allAttempts, setAllAttempts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  useEffect(() => {
-    if (selectedSubject) {
-      fetchAttemptsForSubject(selectedSubject)
-    }
-  }, [selectedSubject])
+  // No need to re-fetch when subject changes - we already have all attempts
 
   const fetchData = async () => {
     try {
@@ -31,7 +27,7 @@ export default function StudentGrades() {
       ])
 
       setSubjects(subjectsData)
-      setAttempts(attemptsData || [])
+      setAllAttempts(attemptsData || [])
 
       if (subjectsData.length > 0 && !selectedSubject) {
         setSelectedSubject(subjectsData[0].id)
@@ -43,21 +39,8 @@ export default function StudentGrades() {
     }
   }
 
-  const fetchAttemptsForSubject = async (subjectId: string) => {
-    try {
-      const allAttempts = await examApi.getAttempts(undefined, true)
-      const subjectAttempts = allAttempts.filter((attempt: any) => {
-        const exam = attempt.exam
-        return exam && exam.subject_id === subjectId && (attempt.status === 'submitted' || attempt.status === 'timeout')
-      })
-      setAttempts(subjectAttempts)
-    } catch (error: any) {
-      toast.error(error.message || 'Lỗi khi tải dữ liệu')
-    }
-  }
-
   const getSubjectAttempts = (subjectId: string) => {
-    return attempts.filter((attempt: any) => {
+    return allAttempts.filter((attempt: any) => {
       const exam = attempt.exam
       return exam && exam.subject_id === subjectId && (attempt.status === 'submitted' || attempt.status === 'timeout')
     })
