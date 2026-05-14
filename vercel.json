@@ -6,6 +6,10 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/deepseek/:path*",
+      "destination": "http://36.50.135.174:20128/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

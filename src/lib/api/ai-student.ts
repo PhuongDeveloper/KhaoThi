@@ -1,15 +1,19 @@
 // ============================================================
-// ai-student.ts — Đã tái cấu trúc: chuyển từ Gemini sang DeepSeek
+// ai-student.ts — Module AI cho Học sinh (Student-facing)
 // ============================================================
-// LUỒNG CŨ (Gemini):
+//
+// ĐÃ TÁI CẤU TRÚC: Chuyển toàn bộ từ Gemini sang DeepSeek
+//
+// LUỒNG CŨ (Gemini — ĐÃ LOẠI BỎ HOÀN TOÀN):
 //   - Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
 //   - Parse: data.candidates[0].content.parts[0].text
 //
 // LUỒNG MỚI (DeepSeek — OpenAI Compatible):
 //   - Endpoint: http://36.50.135.174:20128/v1/chat/completions
 //   - Parse: data.choices[0].message.content
+//   - Bảo vệ: try-catch với timeout + log lỗi rõ ràng
 //
-// Tất cả logic gọi AI text đã chuyển sang callDeepSeekAPI() từ deepseek.ts
+// Tất cả logic gọi AI text đã chuyển sang callDeepSeekAPI() từ deepseek.ts.
 // File giữ nguyên interface & export để tương thích ngược với Frontend.
 // ============================================================
 
@@ -24,14 +28,16 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore'
+
+// [MỚI] Import helper DeepSeek thay vì gọi Gemini trực tiếp
 import { callDeepSeekAPI, extractJSON } from './deepseek'
 
 // --- KHÔNG CÒN DÙNG Gemini API Key ---
 // const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY  // [ĐÃ XÓA]
-// const GEMINI_API_URL = '...'                                 // [ĐÃ XÓA]
+// const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/...'  // [ĐÃ XÓA]
 
 // ============================================================
-// TYPES (giữ nguyên — không thay đổi)
+// INTERFACES — Giữ nguyên để tương thích ngược với Frontend
 // ============================================================
 
 export interface WrongAnswer {
@@ -177,6 +183,9 @@ export async function getStudentWrongAnswers(studentId: string): Promise<WrongAn
 // ============================================================
 // AI: Phân tích học tập cá nhân hóa
 // ============================================================
+// LUỒNG CŨ: Gọi Gemini generateContent
+// LUỒNG MỚI: Gọi callDeepSeekAPI → parse choices[0].message.content
+// ============================================================
 
 export async function analyzeStudentLearning(
   studentId: string,
@@ -254,6 +263,9 @@ Chỉ trả về JSON.`
 
 // ============================================================
 // AI: Tạo bài luyện tập từ câu sai (gọi ngay sau nộp bài)
+// ============================================================
+// LUỒNG CŨ: Gọi Gemini generateContent
+// LUỒNG MỚI: Gọi callDeepSeekAPI → parse choices[0].message.content
 // ============================================================
 
 export async function generatePracticeFromWrongAnswers(
@@ -513,9 +525,10 @@ export async function autoGeneratePracticeAfterExam(
       })
     }
 
-    // Tạo bài luyện tập
+    // Tạo bài luyện tập — bên trong đã gọi DeepSeek qua callDeepSeekAPI
     return await generatePracticeFromWrongAnswers(studentId, wrongAnswers)
   } catch (error) {
+    // Bảo vệ: không crash app nếu tạo bài luyện tập thất bại
     console.error('[DeepSeek] Lỗi khi tạo bài luyện tập tự động:', error)
     return null
   }
