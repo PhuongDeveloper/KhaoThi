@@ -24,7 +24,7 @@ export async function callDeepSeekAPI(prompt: string, timeoutMs: number = 120_00
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-    console.log('[DeepSeek] Đang gọi API...')
+    console.log('[DeepSeek] Đang gọi API....')
 
     const response = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
