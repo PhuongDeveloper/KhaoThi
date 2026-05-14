@@ -56,7 +56,7 @@ export default function TeacherExamCreate() {
 
   const handleFileUpload = async (file: File) => {
     if (!file) {
-      toast.error('Vui lòng chọn file')
+      toast.error('Vui lòng chọn file!')
       return
     }
 
