@@ -4,7 +4,7 @@
 // Luồng cũ (Gemini): gọi generativelanguage.googleapis.com, parse candidates[0].content.parts[0].text
 // Luồng mới (DeepSeek): gọi máy chủ AI tự host chuẩn OpenAI Compatible, parse choices[0].message.content
 // ============================================================
-
+//add deepseek
 // --- CẤU HÌNH CỨNG cho máy chủ AI tự host (OpenAI Compatible) ---
 const DEEPSEEK_API_URL = 'http://36.50.135.174:20128/v1/chat/completions'
 const DEEPSEEK_API_KEY = 'sk-1b3e1db5a7217c40-rdqzqx-8cdc26e7'

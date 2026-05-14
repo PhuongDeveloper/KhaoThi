@@ -1,26 +1,18 @@
-<<<<<<< HEAD
-=======
 // ============================================================
 // ai-student.ts — Đã tái cấu trúc: chuyển từ Gemini sang DeepSeek
 // ============================================================
 // LUỒNG CŨ (Gemini):
 //   - Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
-//   - Auth: API key qua query param ?key=...
-//   - Payload: { contents: [{ parts: [{ text: prompt }] }] }
 //   - Parse: data.candidates[0].content.parts[0].text
 //
 // LUỒNG MỚI (DeepSeek — OpenAI Compatible):
 //   - Endpoint: http://36.50.135.174:20128/v1/chat/completions
-//   - Auth: Bearer token trong header Authorization
-//   - Payload: { model: "my-deepseek", messages: [{role:"user", content: prompt}], stream: false }
 //   - Parse: data.choices[0].message.content
-//   - Được wrap trong try-catch với timeout + log lỗi rõ ràng
 //
 // Tất cả logic gọi AI text đã chuyển sang callDeepSeekAPI() từ deepseek.ts
 // File giữ nguyên interface & export để tương thích ngược với Frontend.
 // ============================================================
 
->>>>>>> 2ebbff9 (update)
 import { db } from '../firebase'
 import {
   collection,
@@ -32,14 +24,6 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore'
-<<<<<<< HEAD
-
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
-
-// ============================================================
-// TYPES
-=======
 import { callDeepSeekAPI, extractJSON } from './deepseek'
 
 // --- KHÔNG CÒN DÙNG Gemini API Key ---
@@ -48,7 +32,6 @@ import { callDeepSeekAPI, extractJSON } from './deepseek'
 
 // ============================================================
 // TYPES (giữ nguyên — không thay đổi)
->>>>>>> 2ebbff9 (update)
 // ============================================================
 
 export interface WrongAnswer {
@@ -107,11 +90,7 @@ export interface PracticeSession {
 }
 
 // ============================================================
-<<<<<<< HEAD
-// CORE: Thu thập câu sai của học sinh
-=======
 // CORE: Thu thập câu sai của học sinh (không gọi AI — giữ nguyên)
->>>>>>> 2ebbff9 (update)
 // ============================================================
 
 export async function getStudentWrongAnswers(studentId: string): Promise<WrongAnswer[]> {
@@ -198,23 +177,12 @@ export async function getStudentWrongAnswers(studentId: string): Promise<WrongAn
 // ============================================================
 // AI: Phân tích học tập cá nhân hóa
 // ============================================================
-<<<<<<< HEAD
-=======
-// LUỒNG CŨ: Gọi Gemini API, parse candidates[0].content.parts[0].text
-// LUỒNG MỚI: Gọi DeepSeek API qua callDeepSeekAPI(), parse choices[0].message.content
-// ============================================================
->>>>>>> 2ebbff9 (update)
 
 export async function analyzeStudentLearning(
   studentId: string,
   wrongAnswers: WrongAnswer[],
   allAttempts: any[]
 ): Promise<LearningAnalysis> {
-<<<<<<< HEAD
-  if (!GEMINI_API_KEY) throw new Error('Gemini API chưa được cấu hình')
-
-=======
->>>>>>> 2ebbff9 (update)
   // Tổng hợp dữ liệu theo môn
   const subjectMap: Record<string, { wrong: WrongAnswer[]; attempts: any[] }> = {}
   for (const wa of wrongAnswers) {
@@ -265,33 +233,6 @@ LƯU Ý:
 
 Chỉ trả về JSON.`
 
-<<<<<<< HEAD
-  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-    }),
-  })
-
-  if (!response.ok) throw new Error(`Gemini API lỗi: ${response.statusText}`)
-
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('AI trả về format không hợp lệ')
-
-  const analysis: LearningAnalysis = JSON.parse(jsonMatch[0])
-
-  // Lưu vào Firestore
-  await addDoc(collection(db, 'ai_learning_analyses'), {
-    student_id: studentId,
-    ...analysis,
-    created_at: Timestamp.fromDate(new Date()),
-  })
-
-  return analysis
-=======
   try {
     // [MỚI] Gọi DeepSeek thay vì Gemini
     const responseText = await callDeepSeekAPI(prompt)
@@ -309,28 +250,17 @@ Chỉ trả về JSON.`
     console.error('[DeepSeek] Lỗi khi phân tích học tập:', error)
     throw error
   }
->>>>>>> 2ebbff9 (update)
 }
 
 // ============================================================
 // AI: Tạo bài luyện tập từ câu sai (gọi ngay sau nộp bài)
 // ============================================================
-<<<<<<< HEAD
-=======
-// LUỒNG CŨ: Gọi Gemini API
-// LUỒNG MỚI: Gọi DeepSeek API
-// ============================================================
->>>>>>> 2ebbff9 (update)
 
 export async function generatePracticeFromWrongAnswers(
   studentId: string,
   wrongAnswers: WrongAnswer[],
   subjectFilter?: string
 ): Promise<PracticeSession | null> {
-<<<<<<< HEAD
-  if (!GEMINI_API_KEY) throw new Error('Gemini API chưa được cấu hình')
-=======
->>>>>>> 2ebbff9 (update)
   if (wrongAnswers.length === 0) return null
 
   // Lọc theo môn nếu có
@@ -384,62 +314,6 @@ Trả về JSON:
 
 Chỉ trả về JSON, tiếng Việt.`
 
-<<<<<<< HEAD
-  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-    }),
-  })
-
-  if (!response.ok) throw new Error(`Gemini API lỗi: ${response.statusText}`)
-
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('AI trả về format không hợp lệ')
-
-  const parsed = JSON.parse(jsonMatch[0])
-
-  // Format questions với IDs
-  const questions: PracticeQuestion[] = (parsed.questions || []).map((q: any, idx: number) => ({
-    id: `pq_${Date.now()}_${idx}`,
-    content: q.content,
-    question_type: 'multiple_choice' as const,
-    answers: (q.answers || []).map((a: any, aidx: number) => ({
-      id: `pa_${Date.now()}_${idx}_${aidx}`,
-      content: a.content,
-      is_correct: a.is_correct,
-    })),
-    topic: parsed.topic || '',
-    explanation: q.explanation || '',
-    relatedToOriginal: q.relatedToOriginal || '',
-  }))
-
-  // Lưu session vào Firestore
-  const session: Omit<PracticeSession, 'id'> = {
-    student_id: studentId,
-    subject_id: subjectId,
-    subject_name: subjectName,
-    topic: parsed.topic || 'Luyện tập tổng hợp',
-    questions,
-    student_answers: {},
-    score: 0,
-    total: questions.length,
-    ai_feedback: '',
-    status: 'pending',
-    created_at: Timestamp.fromDate(new Date()),
-  }
-
-  const docRef = await addDoc(collection(db, 'ai_practice_sessions'), session)
-
-  return { ...session, id: docRef.id }
-}
-
-// ============================================================
-// Chấm bài luyện tập + nhận xét AI
-=======
   try {
     // [MỚI] Gọi DeepSeek thay vì Gemini
     const responseText = await callDeepSeekAPI(prompt)
@@ -486,7 +360,6 @@ Chỉ trả về JSON, tiếng Việt.`
 
 // ============================================================
 // Chấm bài luyện tập + nhận xét AI (không gọi AI — giữ nguyên)
->>>>>>> 2ebbff9 (update)
 // ============================================================
 
 export async function submitPracticeSession(
@@ -544,11 +417,7 @@ export async function submitPracticeSession(
 }
 
 // ============================================================
-<<<<<<< HEAD
-// Lấy danh sách bài luyện tập của học sinh
-=======
 // Lấy danh sách bài luyện tập của học sinh (không gọi AI — giữ nguyên)
->>>>>>> 2ebbff9 (update)
 // ============================================================
 
 export async function getStudentPracticeSessions(studentId: string): Promise<PracticeSession[]> {
@@ -647,11 +516,7 @@ export async function autoGeneratePracticeAfterExam(
     // Tạo bài luyện tập
     return await generatePracticeFromWrongAnswers(studentId, wrongAnswers)
   } catch (error) {
-<<<<<<< HEAD
-    console.error('[AI] Lỗi khi tạo bài luyện tập tự động:', error)
-=======
     console.error('[DeepSeek] Lỗi khi tạo bài luyện tập tự động:', error)
->>>>>>> 2ebbff9 (update)
     return null
   }
 }
