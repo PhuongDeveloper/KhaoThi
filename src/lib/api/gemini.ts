@@ -1,3 +1,26 @@
+<<<<<<< HEAD
+=======
+// ============================================================
+// gemini.ts — Đã tái cấu trúc: chuyển từ Gemini sang DeepSeek
+// ============================================================
+// LUỒNG CŨ (Gemini):
+//   - Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+//   - Auth: API key qua query param ?key=...
+//   - Payload: { contents: [{ parts: [{ text: prompt }] }] }
+//   - Parse: data.candidates[0].content.parts[0].text
+//
+// LUỒNG MỚI (DeepSeek — OpenAI Compatible):
+//   - Endpoint: http://36.50.135.174:20128/v1/chat/completions
+//   - Auth: Bearer token trong header Authorization
+//   - Payload: { model: "my-deepseek", messages: [{role:"user", content: prompt}], stream: false }
+//   - Parse: data.choices[0].message.content
+//   - Được wrap trong try-catch với timeout + log lỗi rõ ràng
+//
+// Tất cả logic gọi AI text đã chuyển sang callDeepSeekAPI() từ deepseek.ts
+// File giữ nguyên interface & export để tương thích ngược với Frontend.
+// ============================================================
+
+>>>>>>> 2ebbff9 (update)
 import { db } from '../firebase'
 import {
   collection,
@@ -10,9 +33,17 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore'
+<<<<<<< HEAD
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+=======
+import { callDeepSeekAPI, extractJSON } from './deepseek'
+
+// --- KHÔNG CÒN DÙNG Gemini API Key ---
+// const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY  // [ĐÃ XÓA]
+// const GEMINI_API_URL = '...'                                 // [ĐÃ XÓA]
+>>>>>>> 2ebbff9 (update)
 
 export interface QuestionGenerationRequest {
   inputText: string
@@ -96,7 +127,11 @@ async function checkApiLimit(teacherId: string): Promise<boolean> {
     return totalCalls < MAX_DAILY_API_CALLS
   } catch (error) {
     // Nếu có lỗi (ví dụ thiếu index / lỗi quyền), log lại nhưng KHÔNG chặn người dùng
+<<<<<<< HEAD
     console.error('[Gemini] Lỗi khi kiểm tra giới hạn API:', error)
+=======
+    console.error('[DeepSeek] Lỗi khi kiểm tra giới hạn API:', error)
+>>>>>>> 2ebbff9 (update)
     return true
   }
 }
@@ -144,22 +179,37 @@ function getMimeType(fileName: string, fileType: string): string {
   }
 }
 
+<<<<<<< HEAD
 // Hàm phân tích file và trích xuất câu hỏi - gửi file trực tiếp cho AI
+=======
+// ============================================================
+// Phân tích file và trích xuất câu hỏi
+// ============================================================
+// LUỒNG CŨ: Gửi file dạng inline_data (base64) kèm prompt cho Gemini
+// LUỒNG MỚI: DeepSeek (text-only) — đọc file thành text rồi gửi prompt
+// Lưu ý: DeepSeek API (chuẩn OpenAI) không hỗ trợ inline file binary,
+//         nên ta chuyển nội dung file sang text trước khi gửi.
+// ============================================================
+>>>>>>> 2ebbff9 (update)
 export async function analyzeFileAndExtractQuestions(
   file: File,
   examId: string,
   teacherId: string
 ): Promise<GeneratedQuestion[]> {
+<<<<<<< HEAD
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API key not configured')
   }
 
+=======
+>>>>>>> 2ebbff9 (update)
   // Kiểm tra giới hạn API
   const canCall = await checkApiLimit(teacherId)
   if (!canCall) {
     throw new Error('Đã vượt quá giới hạn số lần gọi API trong ngày')
   }
 
+<<<<<<< HEAD
   // Chuyển file sang base64
   const fileData = await fileToBase64(file)
   const mimeType = getMimeType(file.name, file.type)
@@ -167,6 +217,26 @@ export async function analyzeFileAndExtractQuestions(
   const prompt = `Bạn là một hệ thống AI chuyên phân tích tài liệu giáo dục. Nhiệm vụ của bạn là đọc và phân tích file "${file.name}" và trích xuất tất cả các câu hỏi.
 
 File đã được gửi kèm trong request này.
+=======
+  // Đọc nội dung file thành text
+  // Với file text-based (.txt, .csv), đọc trực tiếp
+  // Với file khác, chuyển sang base64 và nhúng vào prompt
+  let fileContent = ''
+  const mimeType = getMimeType(file.name, file.type)
+
+  if (mimeType === 'text/plain' || file.name.endsWith('.csv')) {
+    fileContent = await file.text()
+  } else {
+    // Với file binary (pdf, docx...), chuyển sang base64 và ghi chú cho AI
+    const base64Data = await fileToBase64(file)
+    fileContent = `[File "${file.name}" (${mimeType}) - Nội dung base64]:\n${base64Data.substring(0, 50000)}`
+  }
+
+  const prompt = `Bạn là một hệ thống AI chuyên phân tích tài liệu giáo dục. Nhiệm vụ của bạn là đọc và phân tích file "${file.name}" và trích xuất tất cả các câu hỏi.
+
+Nội dung file:
+${fileContent}
+>>>>>>> 2ebbff9 (update)
 
 Yêu cầu:
 1. Phân tích và xác định loại câu hỏi cho mỗi câu:
@@ -206,6 +276,7 @@ Lưu ý:
 Chỉ trả về JSON, không có text thêm.`
 
   try {
+<<<<<<< HEAD
     // Gửi file kèm prompt cho Gemini API
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -246,6 +317,12 @@ Chỉ trả về JSON, không có text thêm.`
     }
 
     const parsed = JSON.parse(jsonMatch[0])
+=======
+    // [MỚI] Gọi DeepSeek thay vì Gemini
+    const responseText = await callDeepSeekAPI(prompt)
+    const parsed = extractJSON(responseText)
+
+>>>>>>> 2ebbff9 (update)
     const questions: GeneratedQuestion[] = (parsed.questions || []).map((q: any) => ({
       ...q,
       difficulty: 'medium' as const,
@@ -257,11 +334,24 @@ Chỉ trả về JSON, không có text thêm.`
 
     return questions
   } catch (error) {
+<<<<<<< HEAD
+=======
+    console.error('[DeepSeek] Lỗi khi phân tích file:', error)
+>>>>>>> 2ebbff9 (update)
     throw error
   }
 }
 
+<<<<<<< HEAD
 // Hàm tự động tính toán kết quả cho các câu hỏi
+=======
+// ============================================================
+// Tự động tính toán đáp án cho các câu hỏi
+// ============================================================
+// LUỒNG CŨ: Gọi Gemini API, parse candidates[0].content.parts[0].text
+// LUỒNG MỚI: Gọi DeepSeek API qua callDeepSeekAPI(), parse choices[0].message.content
+// ============================================================
+>>>>>>> 2ebbff9 (update)
 export async function autoCalculateAnswers(
   questions: Array<{
     content: string
@@ -281,10 +371,13 @@ export async function autoCalculateAnswers(
   correct_answers?: number[] // Cho true_false_multi (mảng các index đúng)
   correct_answer?: string // Cho short_answer
 }>> {
+<<<<<<< HEAD
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API key not configured')
   }
 
+=======
+>>>>>>> 2ebbff9 (update)
   // Kiểm tra giới hạn API
   const canCall = await checkApiLimit(teacherId)
   if (!canCall) {
@@ -351,6 +444,7 @@ Lưu ý:
 Chỉ trả về JSON, không có text thêm.`
 
   try {
+<<<<<<< HEAD
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -388,15 +482,28 @@ Chỉ trả về JSON, không có text thêm.`
 
     // Ghi nhận API call (không có examId vì đây là tính toán tạm thời)
     // Sử dụng một UUID tạm để ghi nhận
+=======
+    // [MỚI] Gọi DeepSeek thay vì Gemini
+    const responseText = await callDeepSeekAPI(prompt)
+    const parsed = extractJSON(responseText)
+    const answers = parsed.answers || []
+
+    // Ghi nhận API call
+>>>>>>> 2ebbff9 (update)
     const tempExamId = '00000000-0000-0000-0000-000000000000'
     await recordApiCall(teacherId, tempExamId, 1)
 
     return answers
   } catch (error) {
+<<<<<<< HEAD
+=======
+    console.error('[DeepSeek] Lỗi khi tính toán đáp án:', error)
+>>>>>>> 2ebbff9 (update)
     throw error
   }
 }
 
+<<<<<<< HEAD
 // Hàm cũ - giữ lại để tương thích (có thể xóa sau)
 export async function generateQuestions(
   request: QuestionGenerationRequest
@@ -405,6 +512,17 @@ export async function generateQuestions(
     throw new Error('Gemini API key not configured')
   }
 
+=======
+// ============================================================
+// Hàm cũ generateQuestions — giữ lại để tương thích
+// ============================================================
+// LUỒNG CŨ: Gọi Gemini API
+// LUỒNG MỚI: Gọi DeepSeek API
+// ============================================================
+export async function generateQuestions(
+  request: QuestionGenerationRequest
+): Promise<GeneratedQuestion[]> {
+>>>>>>> 2ebbff9 (update)
   // Lấy teacher_id từ exam
   const examDoc = await getDoc(doc(db, 'exams', request.examId))
   if (!examDoc.exists()) {
@@ -447,6 +565,7 @@ Yêu cầu:
 Chỉ trả về JSON, không có text thêm.`
 
   try {
+<<<<<<< HEAD
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -479,6 +598,11 @@ Chỉ trả về JSON, không có text thêm.`
     }
 
     const parsed = JSON.parse(jsonMatch[0])
+=======
+    // [MỚI] Gọi DeepSeek thay vì Gemini
+    const responseText = await callDeepSeekAPI(prompt)
+    const parsed = extractJSON(responseText)
+>>>>>>> 2ebbff9 (update)
     const questions: GeneratedQuestion[] = parsed.questions || []
 
     // Ghi nhận API call
@@ -486,10 +610,15 @@ Chỉ trả về JSON, không có text thêm.`
 
     return questions
   } catch (error) {
+<<<<<<< HEAD
+=======
+    console.error('[DeepSeek] Lỗi khi tạo câu hỏi:', error)
+>>>>>>> 2ebbff9 (update)
     throw error
   }
 }
 
+<<<<<<< HEAD
 export async function analyzeExamResults(
   request: ExamAnalysisRequest
 ): Promise<ExamAnalysis> {
@@ -497,6 +626,17 @@ export async function analyzeExamResults(
     throw new Error('Gemini API key not configured')
   }
 
+=======
+// ============================================================
+// Phân tích kết quả bài thi
+// ============================================================
+// LUỒNG CŨ: Gọi Gemini API
+// LUỒNG MỚI: Gọi DeepSeek API
+// ============================================================
+export async function analyzeExamResults(
+  request: ExamAnalysisRequest
+): Promise<ExamAnalysis> {
+>>>>>>> 2ebbff9 (update)
   const examDoc = await getDoc(doc(db, 'exams', request.examId))
   if (!examDoc.exists()) {
     throw new Error('Exam not found')
@@ -527,6 +667,7 @@ Hãy phân tích và trả về JSON với format:
 Chỉ trả về JSON, không có text thêm.`
 
   try {
+<<<<<<< HEAD
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -558,6 +699,11 @@ Chỉ trả về JSON, không có text thêm.`
     }
 
     const analysis: ExamAnalysis = JSON.parse(jsonMatch[0])
+=======
+    // [MỚI] Gọi DeepSeek thay vì Gemini
+    const responseText = await callDeepSeekAPI(prompt)
+    const analysis: ExamAnalysis = extractJSON(responseText)
+>>>>>>> 2ebbff9 (update)
 
     // Lưu phân tích vào database
     const attemptRef = doc(db, 'exam_attempts', request.attemptId)
@@ -565,19 +711,35 @@ Chỉ trả về JSON, không có text thêm.`
 
     return analysis
   } catch (error) {
+<<<<<<< HEAD
+=======
+    console.error('[DeepSeek] Lỗi khi phân tích kết quả thi:', error)
+>>>>>>> 2ebbff9 (update)
     throw error
   }
 }
 
+<<<<<<< HEAD
 // Trích xuất họ và tên học sinh từ raw text của Excel
+=======
+// ============================================================
+// Trích xuất họ và tên học sinh từ raw text của Excel
+// ============================================================
+// LUỒNG CŨ: Gọi Gemini API
+// LUỒNG MỚI: Gọi DeepSeek API
+// ============================================================
+>>>>>>> 2ebbff9 (update)
 export async function extractStudentNamesFromText(
   text: string,
   teacherId: string = 'admin' // Mặc định là admin cho action này
 ): Promise<string[]> {
+<<<<<<< HEAD
   if (!GEMINI_API_KEY) {
     throw new Error('Gemini API key không được cấu hình')
   }
 
+=======
+>>>>>>> 2ebbff9 (update)
   // Kiểm tra giới hạn API
   const canCall = await checkApiLimit(teacherId)
   if (!canCall) {
@@ -606,6 +768,7 @@ Format JSON bắt buộc như sau:
 Chỉ trả về JSON, tuyệt đối không có text nào thêm ở xung quanh.`
 
   try {
+<<<<<<< HEAD
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -638,13 +801,25 @@ Chỉ trả về JSON, tuyệt đối không có text nào thêm ở xung quanh.
     }
 
     const parsed = JSON.parse(jsonMatch[0])
+=======
+    // [MỚI] Gọi DeepSeek thay vì Gemini
+    const responseText = await callDeepSeekAPI(prompt)
+    const parsed = extractJSON(responseText)
+>>>>>>> 2ebbff9 (update)
 
     // Ghi nhận
     await recordApiCall(teacherId, 'bulk_create_users', 1)
 
     return parsed.names || []
   } catch (error) {
+<<<<<<< HEAD
     throw error // Re-throw
   }
 }
 
+=======
+    console.error('[DeepSeek] Lỗi khi trích xuất tên học sinh:', error)
+    throw error
+  }
+}
+>>>>>>> 2ebbff9 (update)
