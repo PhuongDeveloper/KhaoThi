@@ -1,19 +1,11 @@
 // ============================================================
-// ai-student.ts — Module AI cho Học sinh (Student-facing)
+// ai-student.ts — Luồng Gemini dùng cho AI học sinh (Student-facing)
 // ============================================================
+// Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
+// Auth: API key qua query param ?key=VITE_GEMINI_API_KEY
+// Payload: { contents: [{ parts: [{ text: prompt }] }] }
+// Parse: data.candidates[0].content.parts[0].text
 //
-// ĐÃ TÁI CẤU TRÚC: Chuyển toàn bộ từ Gemini sang DeepSeek
-//
-// LUỒNG CŨ (Gemini — ĐÃ LOẠI BỎ HOÀN TOÀN):
-//   - Endpoint: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
-//   - Parse: data.candidates[0].content.parts[0].text
-//
-// LUỒNG MỚI (DeepSeek — OpenAI Compatible):
-//   - Endpoint: http://36.50.135.174:20128/v1/chat/completions
-//   - Parse: data.choices[0].message.content
-//   - Bảo vệ: try-catch với timeout + log lỗi rõ ràng
-//
-// Tất cả logic gọi AI text đã chuyển sang callDeepSeekAPI() từ deepseek.ts.
 // File giữ nguyên interface & export để tương thích ngược với Frontend.
 // ============================================================
 
@@ -29,12 +21,9 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 
-// [MỚI] Import helper DeepSeek thay vì gọi Gemini trực tiếp
-import { callDeepSeekAPI, extractJSON } from './deepseek'
-
-// --- KHÔNG CÒN DÙNG Gemini API Key ---
-// const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY  // [ĐÃ XÓA]
-// const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/...'  // [ĐÃ XÓA]
+// --- Gemini API Configuration ---
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 // ============================================================
 // INTERFACES — Giữ nguyên để tương thích ngược với Frontend
@@ -57,7 +46,7 @@ export interface TopicWeakness {
   subjectId: string
   wrongCount: number
   totalCount: number
-  accuracy: number // 0-100
+  accuracy: number
   sampleQuestions: string[]
 }
 
@@ -76,7 +65,7 @@ export interface PracticeQuestion {
   question_type: 'multiple_choice'
   answers: Array<{ id: string; content: string; is_correct: boolean }>
   topic: string
-  relatedToOriginal: string // Nội dung câu gốc mà học sinh làm sai
+  relatedToOriginal: string
 }
 
 export interface PracticeSession {
@@ -86,7 +75,7 @@ export interface PracticeSession {
   subject_name: string
   topic: string
   questions: PracticeQuestion[]
-  student_answers: Record<string, string> // questionId -> answerId
+  student_answers: Record<string, string>
   score: number
   total: number
   ai_feedback: string
@@ -102,7 +91,6 @@ export interface PracticeSession {
 export async function getStudentWrongAnswers(studentId: string): Promise<WrongAnswer[]> {
   const wrongAnswers: WrongAnswer[] = []
 
-  // 1. Lấy tất cả attempts đã nộp của học sinh
   const attemptsSnap = await getDocs(
     query(
       collection(db, 'exam_attempts'),
@@ -115,12 +103,10 @@ export async function getStudentWrongAnswers(studentId: string): Promise<WrongAn
     const attempt = attemptDoc.data()
     const examId = attempt.exam_id
 
-    // 2. Lấy thông tin exam
     const examDoc = await getDoc(doc(db, 'exams', examId))
     if (!examDoc.exists()) continue
     const exam = examDoc.data()
 
-    // 3. Lấy subject
     let subjectName = 'Chưa xác định'
     let subjectId = ''
     if (exam.subject_id) {
@@ -131,7 +117,6 @@ export async function getStudentWrongAnswers(studentId: string): Promise<WrongAn
       }
     }
 
-    // 4. Lấy responses sai
     const responsesSnap = await getDocs(
       query(
         collection(db, 'exam_responses'),
@@ -142,13 +127,10 @@ export async function getStudentWrongAnswers(studentId: string): Promise<WrongAn
 
     for (const respDoc of responsesSnap.docs) {
       const resp = respDoc.data()
-
-      // 5. Lấy question content
       const qDoc = await getDoc(doc(db, 'questions', resp.question_id))
       if (!qDoc.exists()) continue
       const question = qDoc.data()
 
-      // Tìm đáp án đúng
       let correctAnswer = ''
       if (question.question_type === 'multiple_choice' && question.answers) {
         const correct = question.answers.find((a: any) => a.is_correct)
@@ -157,7 +139,6 @@ export async function getStudentWrongAnswers(studentId: string): Promise<WrongAn
         correctAnswer = question.correct_answer || ''
       }
 
-      // Tìm đáp án học sinh chọn
       let studentAnswer = resp.text_answer || ''
       if (resp.answer_id && question.answers) {
         const selected = question.answers.find((a: any) => a.id === resp.answer_id)
@@ -181,10 +162,7 @@ export async function getStudentWrongAnswers(studentId: string): Promise<WrongAn
 }
 
 // ============================================================
-// AI: Phân tích học tập cá nhân hóa
-// ============================================================
-// LUỒNG CŨ: Gọi Gemini generateContent
-// LUỒNG MỚI: Gọi callDeepSeekAPI → parse choices[0].message.content
+// AI: Phân tích học tập cá nhân hóa (Gemini text)
 // ============================================================
 
 export async function analyzeStudentLearning(
@@ -192,7 +170,8 @@ export async function analyzeStudentLearning(
   wrongAnswers: WrongAnswer[],
   allAttempts: any[]
 ): Promise<LearningAnalysis> {
-  // Tổng hợp dữ liệu theo môn
+  if (!GEMINI_API_KEY) throw new Error('Gemini API chưa được cấu hình')
+
   const subjectMap: Record<string, { wrong: WrongAnswer[]; attempts: any[] }> = {}
   for (const wa of wrongAnswers) {
     if (!subjectMap[wa.subjectName]) subjectMap[wa.subjectName] = { wrong: [], attempts: [] }
@@ -227,15 +206,15 @@ YÊU CẦU: Phân tích kỹ lưỡng và trả về JSON:
     {"subject": "Tên môn", "topics": ["Chủ đề mạnh 1", "Chủ đề mạnh 2"], "detail": "Giải thích chi tiết"}
   ],
   "weaknesses": [
-    {"subject": "Tên môn", "topics": ["Chủ đề yếu 1"], "detail": "Giải thích chi tiết, ví dụ: yếu phần giảm phân, phương trình bậc 2...", "priority": "high|medium|low"}
+    {"subject": "Tên môn", "topics": ["Chủ đề yếu 1"], "detail": "Giải thích chi tiết", "priority": "high|medium|low"}
   ],
-  "recommendations": ["Lời khuyên cụ thể 1", "Lời khuyên cụ thể 2", ...],
+  "recommendations": ["Lời khuyên cụ thể 1", "Lời khuyên cụ thể 2"],
   "encouragement": "Lời động viên tích cực",
-  "studyPlan": ["Bước 1: ...", "Bước 2: ...", ...]
+  "studyPlan": ["Bước 1: ...", "Bước 2: ..."]
 }
 
 LƯU Ý:
-- Phân tích theo TỪNG CHỦ ĐỀ cụ thể trong mỗi môn (ví dụ: Sinh học - Giảm phân, Toán - Phương trình bậc 2)
+- Phân tích theo TỪNG CHỦ ĐỀ cụ thể trong mỗi môn
 - Đánh giá priority cho điểm yếu: high = rất yếu cần ôn ngay, medium = trung bình, low = chỉ cần chú ý
 - Lời khuyên phải cụ thể, khả thi cho học sinh
 - Viết bằng tiếng Việt, giọng thân thiện, không có các kí tự làm xấu text và emoji
@@ -243,11 +222,24 @@ LƯU Ý:
 Chỉ trả về JSON.`
 
   try {
-    // [MỚI] Gọi DeepSeek thay vì Gemini
-    const responseText = await callDeepSeekAPI(prompt)
-    const analysis: LearningAnalysis = extractJSON(responseText)
+    // Gọi Gemini API
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    })
 
-    // Lưu vào Firestore
+    if (!response.ok) throw new Error(`Gemini API lỗi: ${response.statusText}`)
+
+    const data = await response.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('AI trả về format không hợp lệ')
+
+    const analysis: LearningAnalysis = JSON.parse(jsonMatch[0])
+
     await addDoc(collection(db, 'ai_learning_analyses'), {
       student_id: studentId,
       ...analysis,
@@ -256,16 +248,14 @@ Chỉ trả về JSON.`
 
     return analysis
   } catch (error) {
-    console.error('[DeepSeek] Lỗi khi phân tích học tập:', error)
+    // Xử lý lỗi — log rõ ràng, không crash app
+    console.error('[Gemini] Lỗi khi phân tích học tập:', error)
     throw error
   }
 }
 
 // ============================================================
-// AI: Tạo bài luyện tập từ câu sai (gọi ngay sau nộp bài)
-// ============================================================
-// LUỒNG CŨ: Gọi Gemini generateContent
-// LUỒNG MỚI: Gọi callDeepSeekAPI → parse choices[0].message.content
+// AI: Tạo bài luyện tập từ câu sai (Gemini text)
 // ============================================================
 
 export async function generatePracticeFromWrongAnswers(
@@ -273,16 +263,15 @@ export async function generatePracticeFromWrongAnswers(
   wrongAnswers: WrongAnswer[],
   subjectFilter?: string
 ): Promise<PracticeSession | null> {
+  if (!GEMINI_API_KEY) throw new Error('Gemini API chưa được cấu hình')
   if (wrongAnswers.length === 0) return null
 
-  // Lọc theo môn nếu có
   const filtered = subjectFilter
     ? wrongAnswers.filter(w => w.subjectId === subjectFilter || w.subjectName === subjectFilter)
     : wrongAnswers
 
   if (filtered.length === 0) return null
 
-  // Lấy tối đa 10 câu sai để làm cơ sở
   const sampleWrong = filtered.slice(0, 10)
   const subjectName = sampleWrong[0].subjectName
   const subjectId = sampleWrong[0].subjectId
@@ -297,10 +286,7 @@ CÂU HỎI HỌC SINH LÀM SAI:
 ${wrongQuestionsText}
 
 QUY TẮC TẠO CÂU HỎI (RẤT QUAN TRỌNG):
-1. Đa số câu hỏi (7-8/10 câu) phải RẤT TƯƠNG TỰ với câu gốc mà học sinh làm sai:
-   - Cùng dạng bài, cùng cách hỏi, chỉ thay đổi số liệu/tên/chi tiết nhỏ
-   - Ví dụ: nếu câu gốc hỏi về số NST trong giảm phân, câu mới cũng hỏi về số NST nhưng với loài khác
-   - Ví dụ: nếu câu gốc hỏi về công thức hóa học, câu mới hỏi về công thức tương tự
+1. Đa số câu hỏi (7-8/10 câu) phải RẤT TƯƠNG TỰ với câu gốc mà học sinh làm sai
 2. Còn lại 2-3 câu có thể mở rộng sang kiến thức liên quan gần nhất
 3. Tạo đúng 10 câu hỏi trắc nghiệm (4 đáp án, 1 đáp án đúng)
 4. Mỗi câu có giải thích ngắn gọn cho đáp án đúng
@@ -327,11 +313,24 @@ Trả về JSON:
 Chỉ trả về JSON, tiếng Việt.`
 
   try {
-    // [MỚI] Gọi DeepSeek thay vì Gemini
-    const responseText = await callDeepSeekAPI(prompt)
-    const parsed = extractJSON(responseText)
+    // Gọi Gemini API
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    })
 
-    // Format questions với IDs
+    if (!response.ok) throw new Error(`Gemini API lỗi: ${response.statusText}`)
+
+    const data = await response.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('AI trả về format không hợp lệ')
+
+    const parsed = JSON.parse(jsonMatch[0])
+
     const questions: PracticeQuestion[] = (parsed.questions || []).map((q: any, idx: number) => ({
       id: `pq_${Date.now()}_${idx}`,
       content: q.content,
@@ -346,7 +345,6 @@ Chỉ trả về JSON, tiếng Việt.`
       relatedToOriginal: q.relatedToOriginal || '',
     }))
 
-    // Lưu session vào Firestore
     const session: Omit<PracticeSession, 'id'> = {
       student_id: studentId,
       subject_id: subjectId,
@@ -362,16 +360,16 @@ Chỉ trả về JSON, tiếng Việt.`
     }
 
     const docRef = await addDoc(collection(db, 'ai_practice_sessions'), session)
-
     return { ...session, id: docRef.id }
   } catch (error) {
-    console.error('[DeepSeek] Lỗi khi tạo bài luyện tập:', error)
+    // Xử lý lỗi — log rõ ràng, không crash app
+    console.error('[Gemini] Lỗi khi tạo bài luyện tập:', error)
     throw error
   }
 }
 
 // ============================================================
-// Chấm bài luyện tập + nhận xét AI (không gọi AI — giữ nguyên)
+// Chấm bài luyện tập + nhận xét (không gọi AI — giữ nguyên)
 // ============================================================
 
 export async function submitPracticeSession(
@@ -383,7 +381,6 @@ export async function submitPracticeSession(
 
   const session = sessionDoc.data() as PracticeSession
 
-  // Chấm điểm
   let correctCount = 0
   const results: Array<{ question: string; correct: boolean; explanation: string }> = []
 
@@ -391,9 +388,7 @@ export async function submitPracticeSession(
     const studentAnswerId = answers[q.id]
     const correctAnswer = q.answers.find(a => a.is_correct)
     const isCorrect = studentAnswerId === correctAnswer?.id
-
     if (isCorrect) correctCount++
-
     results.push({
       question: q.content.substring(0, 60),
       correct: isCorrect,
@@ -406,7 +401,6 @@ export async function submitPracticeSession(
   const scoreOutOf10 = Math.round((score / total) * 10 * 100) / 100
   const passed = scoreOutOf10 >= 8
 
-  // Tạo nhận xét AI
   let feedback = ''
   if (passed) {
     feedback = `Tuyệt vời! Em đã đạt ${score}/${total} câu đúng (${scoreOutOf10}/10 điểm). Em đã nắm vững chủ đề "${session.topic}". Hãy tiếp tục phát huy!`
@@ -414,7 +408,6 @@ export async function submitPracticeSession(
     feedback = `Em đạt ${score}/${total} câu đúng (${scoreOutOf10}/10 điểm) cho chủ đề "${session.topic}". Cần ôn thêm một chút nữa. Hãy thử lại với bộ câu hỏi mới!`
   }
 
-  // Cập nhật Firestore
   const { updateDoc } = await import('firebase/firestore')
   await updateDoc(doc(db, 'ai_practice_sessions', sessionId), {
     student_answers: answers,
@@ -459,7 +452,6 @@ export async function autoGeneratePracticeAfterExam(
   examId: string
 ): Promise<PracticeSession | null> {
   try {
-    // Lấy attempt mới nhất của exam này
     const attemptsSnap = await getDocs(
       query(
         collection(db, 'exam_attempts'),
@@ -470,10 +462,8 @@ export async function autoGeneratePracticeAfterExam(
     )
 
     if (attemptsSnap.empty) return null
-
     const latestAttempt = attemptsSnap.docs[attemptsSnap.docs.length - 1]
 
-    // Lấy responses sai
     const responsesSnap = await getDocs(
       query(
         collection(db, 'exam_responses'),
@@ -482,9 +472,8 @@ export async function autoGeneratePracticeAfterExam(
       )
     )
 
-    if (responsesSnap.empty) return null // Không có câu sai
+    if (responsesSnap.empty) return null
 
-    // Lấy exam info
     const examDoc = await getDoc(doc(db, 'exams', examId))
     if (!examDoc.exists()) return null
     const exam = examDoc.data()
@@ -499,7 +488,6 @@ export async function autoGeneratePracticeAfterExam(
       }
     }
 
-    // Build wrong answers
     const wrongAnswers: WrongAnswer[] = []
     for (const respDoc of responsesSnap.docs) {
       const resp = respDoc.data()
@@ -525,11 +513,10 @@ export async function autoGeneratePracticeAfterExam(
       })
     }
 
-    // Tạo bài luyện tập — bên trong đã gọi DeepSeek qua callDeepSeekAPI
     return await generatePracticeFromWrongAnswers(studentId, wrongAnswers)
   } catch (error) {
     // Bảo vệ: không crash app nếu tạo bài luyện tập thất bại
-    console.error('[DeepSeek] Lỗi khi tạo bài luyện tập tự động:', error)
+    console.error('[Gemini] Lỗi khi tạo bài luyện tập tự động:', error)
     return null
   }
 }
