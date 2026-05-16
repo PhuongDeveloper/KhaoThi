@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuthStore } from '../../store/authStore'
 import { examApi } from '../../lib/api/exams'
 import {
@@ -27,6 +27,7 @@ import {
   ArrowRight,
   BarChart3,
   Loader2,
+  Bell,
 } from 'lucide-react'
 import {
   RadarChart,
@@ -61,6 +62,8 @@ export default function StudentAIPractice() {
   const [submittingPractice, setSubmittingPractice] = useState(false)
 
   const [lastSubjectFilter, setLastSubjectFilter] = useState<string | undefined>()
+  const [showNotifications, setShowNotifications] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
 
   const fetchData = useCallback(async () => {
     if (!profile?.id) return
@@ -85,6 +88,25 @@ export default function StudentAIPractice() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Close notification dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Notification badge count: pending + failed (score < 8)
+  const notificationCount = sessions.filter(
+    s => s.status === 'pending' || (s.status === 'completed' && s.score < 8)
+  ).length
+  const notificationSessions = sessions.filter(
+    s => s.status === 'pending' || (s.status === 'completed' && s.score < 8)
+  ).slice(0, 10)
 
   const handleAnalyze = async () => {
     if (!profile?.id) return
@@ -192,13 +214,87 @@ export default function StudentAIPractice() {
           <h1 className="text-2xl font-bold text-gray-900">AI Trợ lý Học tập</h1>
           <p className="text-gray-500 mt-1">Hệ thống phân tích thông minh và đề xuất lộ trình ôn tập cá nhân hóa</p>
         </div>
-        <button
-          onClick={fetchData}
-          className="btn btn-secondary flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          Làm mới dữ liệu
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Notification Bell */}
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative p-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors shadow-sm"
+              title="Thông báo bài luyện tập"
+            >
+              <Bell className="h-5 w-5 text-gray-600" />
+              {notificationCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow-sm animate-pulse">
+                  {notificationCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNotifications && (
+              <div className="absolute right-0 top-12 w-80 sm:w-96 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
+                  <h4 className="font-bold text-gray-800 text-sm">Bài luyện tập cần hoàn thành</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">{notificationCount} bài chưa làm hoặc chưa đạt</p>
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                  {notificationSessions.length === 0 ? (
+                    <div className="p-6 text-center text-gray-400 text-sm">
+                      Không có bài luyện tập nào cần hoàn thành
+                    </div>
+                  ) : (
+                    notificationSessions.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setActivePractice(s)
+                          setPracticeAnswers({})
+                          setPracticeResult(null)
+                          setActiveTab('practice')
+                          setShowNotifications(false)
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-primary-50 transition-colors text-left"
+                      >
+                        <div className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center ${
+                          s.status === 'pending'
+                            ? 'bg-amber-100 text-amber-600'
+                            : 'bg-red-100 text-red-600'
+                        }`}>
+                          {s.status === 'pending' ? (
+                            <Target className="h-4 w-4" />
+                          ) : (
+                            <XCircle className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-800 text-sm truncate">{s.topic}</p>
+                          <p className="text-xs text-gray-500">
+                            {s.subject_name} • {s.status === 'pending' ? 'Chưa làm' : `Chưa đạt (${s.score}/10)`}
+                          </p>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-md ${
+                          s.status === 'pending'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {s.status === 'pending' ? 'Làm ngay' : 'Thử lại'}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={fetchData}
+            className="btn btn-secondary flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Làm mới dữ liệu
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -472,15 +568,20 @@ export default function StudentAIPractice() {
                   <div className="bg-gray-50 h-24 w-24 rounded-full flex items-center justify-center mb-6">
                     <Brain className="h-10 w-10 text-gray-300" />
                   </div>
-                  {wrongAnswers.length === 0 ? (
+                  {allAttempts.length === 0 ? (
                     <>
-                      <h3 className="text-xl font-bold text-gray-800 mb-2">Hệ thống cần thêm dữ liệu</h3>
-                      <p className="text-gray-500 max-w-md">Hãy hoàn thành thêm các bài kiểm tra thực tế để Trợ lý AI có thể đánh giá và đề xuất phương pháp học tập tối ưu nhất cho bạn.</p>
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">Chào bạn!</h3>
+                      <p className="text-gray-500 max-w-md">Bạn chưa làm bài tập nào cả, hãy thử làm một bài kiểm tra để hệ thống phân tích điểm yếu của bạn và đưa ra các phần luyện tập tương ứng nhé.</p>
+                    </>
+                  ) : wrongAnswers.length === 0 ? (
+                    <>
+                      <h3 className="text-xl font-bold text-gray-800 mb-2">Xuất sắc!</h3>
+                      <p className="text-gray-500 max-w-md">Bạn chưa có câu trả lời sai nào. Hãy tiếp tục làm thêm bài kiểm tra để AI có thêm dữ liệu phân tích nhé.</p>
                     </>
                   ) : (
                     <>
                       <h3 className="text-xl font-bold text-gray-800 mb-2">Sẵn sàng phân tích học tập</h3>
-                      <p className="text-gray-500 max-w-md mb-6">Nhấn nút bên cạnh để khối lượng dữ liệu được xử lý và xuất bản báo cáo học tập chi tiết nhất.</p>
+                      <p className="text-gray-500 max-w-md mb-6">Nhấn nút bên cạnh để AI phân tích và đưa ra báo cáo học tập cho bạn.</p>
                       <button
                         onClick={handleAnalyze}
                         disabled={analyzing}

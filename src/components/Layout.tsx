@@ -11,7 +11,8 @@ import {
   School,
   Menu,
   X,
-  Brain
+  Brain,
+  Sparkles
 } from 'lucide-react'
 import { useState } from 'react'
 import toast from 'react-hot-toast'
@@ -51,6 +52,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/teacher', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/teacher/classes', label: 'Lớp học', icon: School },
     { path: '/teacher/exams', label: 'Bài thi', icon: FileText },
+    { path: '/teacher/ai-create', label: 'Tạo Đề AI', icon: Sparkles },
   ]
 
   const studentNavItems = [

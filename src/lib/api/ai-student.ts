@@ -191,33 +191,32 @@ export async function analyzeStudentLearning(
     return `Môn ${name}: ${data.attempts.length} bài thi, điểm TB ${avgScore.toFixed(1)}, ${data.wrong.length} câu sai.\nCâu sai tiêu biểu:\n${wrongTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')}`
   }).join('\n\n')
 
-  const prompt = `Bạn là một trợ lý AI học tập cá nhân hóa cho học sinh cấp 2-3 tại Việt Nam. Hãy phân tích kết quả học tập và đưa ra đánh giá chi tiết.
+  const prompt = `Bạn là trợ lý AI học tập. Phân tích NGẮN GỌN kết quả học tập của học sinh.
 
-DLIỆU HỌC SINH:
+DỮ LIỆU:
 ${subjectSummaries}
+Tổng câu sai: ${wrongAnswers.length}, Tổng bài thi: ${allAttempts.length}
 
-Tổng số câu sai: ${wrongAnswers.length}
-Tổng số bài thi: ${allAttempts.length}
-
-YÊU CẦU: Phân tích kỹ lưỡng và trả về JSON:
+Trả về JSON (NGẮN GỌN, XÚC TÍCH - mỗi trường tối đa 1-2 câu):
 {
-  "overallSummary": "Tóm tắt 2-3 câu về tình trạng học tập tổng thể",
+  "overallSummary": "1 câu tóm tắt ngắn gọn tình trạng học tập",
   "strengths": [
-    {"subject": "Tên môn", "topics": ["Chủ đề mạnh 1", "Chủ đề mạnh 2"], "detail": "Giải thích chi tiết"}
+    {"subject": "Tên môn", "topics": ["Chủ đề mạnh"], "detail": "1 câu ngắn"}
   ],
   "weaknesses": [
-    {"subject": "Tên môn", "topics": ["Chủ đề yếu 1"], "detail": "Giải thích chi tiết", "priority": "high|medium|low"}
+    {"subject": "Tên môn", "topics": ["Chủ đề yếu"], "detail": "1 câu ngắn", "priority": "high|medium|low"}
   ],
-  "recommendations": ["Lời khuyên cụ thể 1", "Lời khuyên cụ thể 2"],
-  "encouragement": "Lời động viên tích cực",
-  "studyPlan": ["Bước 1: ...", "Bước 2: ..."]
+  "recommendations": ["Lời khuyên ngắn 1", "Lời khuyên ngắn 2", "Lời khuyên ngắn 3"],
+  "encouragement": "1 câu động viên ngắn",
+  "studyPlan": ["Bước 1 ngắn gọn", "Bước 2 ngắn gọn", "Bước 3 ngắn gọn"]
 }
 
-LƯU Ý:
-- Phân tích theo TỪNG CHỦ ĐỀ cụ thể trong mỗi môn
-- Đánh giá priority cho điểm yếu: high = rất yếu cần ôn ngay, medium = trung bình, low = chỉ cần chú ý
-- Lời khuyên phải cụ thể, khả thi cho học sinh
-- Viết bằng tiếng Việt, giọng thân thiện, không có các kí tự làm xấu text và emoji
+QUY TẮC BẮT BUỘC:
+- Tối đa 3 strengths, 3 weaknesses, 3 recommendations, 3 studyPlan
+- Mỗi detail/recommendation/studyPlan CHỈ 1 CÂU NGẮN (dưới 30 từ)
+- overallSummary và encouragement CHỈ 1 CÂU
+- priority: high = cần ôn ngay, medium = lưu ý, low = theo dõi
+- Tiếng Việt, không emoji, không ký tự đặc biệt
 
 Chỉ trả về JSON.`
 

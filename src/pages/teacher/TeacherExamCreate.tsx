@@ -3,9 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { examApi } from '../../lib/api/exams'
 import { subjectApi } from '../../lib/api/subjects'
 import { analyzeFileAndExtractQuestions, autoCalculateAnswers } from '../../lib/api/gemini'
+import { getOrCreateBank, addQuestionsToBank } from '../../lib/api/question-bank'
 import { useAuthStore } from '../../store/authStore'
 import toast from 'react-hot-toast'
-import { Save, Upload, FileText, ChevronDown, ChevronUp, Loader2, Image, Sparkles } from 'lucide-react'
+import { Save, Upload, FileText, ChevronDown, ChevronUp, Loader2, Image, Sparkles, X, Database } from 'lucide-react'
 import CustomFileInput from '../../components/CustomFileInput'
 
 export default function TeacherExamCreate() {
@@ -23,6 +24,13 @@ export default function TeacherExamCreate() {
   const [showManualQuestions, setShowManualQuestions] = useState(false)
   const [showImageUpload, setShowImageUpload] = useState<Record<number, boolean>>({})
   const [calculatingAnswers, setCalculatingAnswers] = useState(false)
+
+  // Question bank modal state
+  const [showBankModal, setShowBankModal] = useState(false)
+  const [bankSaveEnabled, setBankSaveEnabled] = useState(false)
+  const [bankSubjectId, setBankSubjectId] = useState('')
+  const [savingToBank, setSavingToBank] = useState(false)
+  const [savedQuestions, setSavedQuestions] = useState<any[]>([])
   const [formData, setFormData] = useState({
     title: '',
     description: '' as string | null,
@@ -350,11 +358,40 @@ export default function TeacherExamCreate() {
       await examApi.createQuestionsWithAnswers(exam.id, allQuestions)
 
       toast.success('Tạo bài thi thành công')
-      navigate(`${basePath}/exams`)
+
+      // Lưu câu hỏi để dùng cho modal ngân hàng
+      setSavedQuestions(allQuestions)
+      setBankSubjectId(formData.subject_id)
+      setShowBankModal(true)
     } catch (error: any) {
       toast.error(error.message || 'Lỗi khi tạo bài thi')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSaveToBank = async () => {
+    if (!profile?.id || !bankSubjectId || savedQuestions.length === 0) return
+    setSavingToBank(true)
+    try {
+      const subject = subjects.find(s => s.id === bankSubjectId)
+      const bank = await getOrCreateBank(profile.id, bankSubjectId, subject?.name || 'Chưa xác định')
+      await addQuestionsToBank(bank.id, savedQuestions.map(q => ({
+        content: q.content,
+        question_type: q.question_type || 'multiple_choice',
+        answers: q.answers,
+        correct_answer: q.correct_answer,
+        difficulty: q.difficulty || 'medium',
+        points: q.points || 1,
+        image_url: q.image_url,
+      })))
+      toast.success(`Đã lưu ${savedQuestions.length} câu hỏi vào ngân hàng "${subject?.name}"`)
+      setShowBankModal(false)
+      navigate(`${basePath}/exams`)
+    } catch (error: any) {
+      toast.error(error.message || 'Lỗi khi lưu vào ngân hàng')
+    } finally {
+      setSavingToBank(false)
     }
   }
 
@@ -1166,7 +1203,97 @@ export default function TeacherExamCreate() {
           </button>
         </div>
       </div>
+
+      {/* Modal: Lưu vào ngân hàng câu hỏi */}
+      {showBankModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-primary-600 to-blue-600 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-white">
+                <Database className="h-5 w-5" />
+                <h3 className="font-bold text-lg">Ngân hàng câu hỏi</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowBankModal(false)
+                  navigate(`${basePath}/exams`)
+                }}
+                className="text-white/80 hover:text-white p-1"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <p className="text-gray-700">
+                Bạn có muốn nhập <strong>{savedQuestions.length} câu hỏi</strong> của bài thi này vào ngân hàng câu hỏi không?
+              </p>
+
+              <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all hover:border-primary-300 ${bankSaveEnabled ? 'border-primary-500 bg-primary-50' : 'border-gray-200'}`}>
+                <input
+                  type="checkbox"
+                  checked={bankSaveEnabled}
+                  onChange={e => setBankSaveEnabled(e.target.checked)}
+                  className="sr-only"
+                />
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                  bankSaveEnabled ? 'bg-primary-600 border-primary-600' : 'border-gray-400'
+                }`}>
+                  {bankSaveEnabled && <span className="text-white text-xs">✓</span>}
+                </div>
+                <span className="font-medium text-gray-800">Lưu vào ngân hàng câu hỏi</span>
+              </label>
+
+              {bankSaveEnabled && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Chọn môn lưu</label>
+                  <select
+                    value={bankSubjectId}
+                    onChange={e => setBankSubjectId(e.target.value)}
+                    className="input"
+                  >
+                    <option value="">Chọn môn học</option>
+                    {subjects.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowBankModal(false)
+                    navigate(`${basePath}/exams`)
+                  }}
+                  className="btn btn-secondary flex-1"
+                >
+                  Bỏ qua
+                </button>
+                {bankSaveEnabled && (
+                  <button
+                    onClick={handleSaveToBank}
+                    disabled={savingToBank || !bankSubjectId}
+                    className="btn btn-primary flex-1 flex items-center justify-center gap-2"
+                  >
+                    {savingToBank ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Đang lưu...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="h-4 w-4" />
+                        Lưu vào ngân hàng
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-

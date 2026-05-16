@@ -556,3 +556,81 @@ Chỉ trả về JSON, tuyệt đối không có text nào thêm ở xung quanh.
     throw error
   }
 }
+
+// ============================================================
+// Chỉnh sửa câu hỏi bằng AI (tạo câu tương tự, giữ cấu trúc)
+// ============================================================
+
+export async function aiEditQuestion(
+  question: {
+    content: string
+    question_type: string
+    answers?: Array<{ content: string; is_correct: boolean }>
+    correct_answer?: string
+  },
+  teacherId: string
+): Promise<{
+  content: string
+  question_type: string
+  answers?: Array<{ content: string; is_correct: boolean }>
+  correct_answer?: string
+}> {
+  const canCall = await checkApiLimit(teacherId)
+  if (!canCall) {
+    throw new Error('Đã vượt quá giới hạn số lần gọi API trong ngày')
+  }
+
+  let questionText = `Loại: ${question.question_type}\nNội dung: ${question.content}\n`
+  if (question.question_type === 'multiple_choice' && question.answers) {
+    questionText += 'Đáp án:\n'
+    question.answers.forEach((a, i) => {
+      questionText += `${String.fromCharCode(65 + i)}. ${a.content} ${a.is_correct ? '(Đúng)' : ''}\n`
+    })
+  } else if (question.question_type === 'true_false_multi' && question.answers) {
+    questionText += 'Các ý:\n'
+    question.answers.forEach((a, i) => {
+      questionText += `${String.fromCharCode(97 + i)}. ${a.content} → ${a.is_correct ? 'Đúng' : 'Sai'}\n`
+    })
+  } else if (question.question_type === 'short_answer') {
+    questionText += `Đáp án đúng: ${question.correct_answer || 'chưa có'}\n`
+  }
+
+  const prompt = `Bạn là giáo viên AI. Đọc câu hỏi sau và tạo 1 CÂU HỎI MỚI tương tự:
+
+${questionText}
+
+YÊU CẦU:
+1. Tạo câu hỏi TƯƠNG TỰ về chủ đề và kiến thức
+2. Độ khó TƯƠNG ĐƯƠNG hoặc CAO HƠN một chút
+3. KHÔNG thay đổi cấu trúc (giữ nguyên loại câu hỏi, số đáp án)
+4. Nội dung phải KHÁC câu gốc (không copy)
+5. Đáp án đúng phải chính xác
+
+Trả về JSON:
+{
+  "content": "Nội dung câu hỏi mới",
+  "question_type": "${question.question_type}",
+  ${question.question_type === 'short_answer'
+    ? '"correct_answer": "đáp án đúng"'
+    : '"answers": [{"content": "Đáp án", "is_correct": true/false}, ...]'}
+}
+
+Chỉ trả về JSON.`
+
+  try {
+    const text = await callGeminiText(prompt)
+    const parsed = parseJsonFromGemini(text)
+
+    await recordApiCall(teacherId, 'ai_edit_question', 1)
+
+    return {
+      content: parsed.content,
+      question_type: parsed.question_type || question.question_type,
+      answers: parsed.answers,
+      correct_answer: parsed.correct_answer,
+    }
+  } catch (error) {
+    console.error('[Gemini] Lỗi khi chỉnh sửa câu hỏi bằng AI:', error)
+    throw error
+  }
+}

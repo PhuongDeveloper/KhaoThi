@@ -8,6 +8,7 @@ import TeacherExamResults from '../pages/teacher/TeacherExamResults'
 import ExamPreview from '../pages/teacher/ExamPreview'
 import StudentExamDetail from '../pages/teacher/StudentExamDetail'
 import ExamMonitoring from '../pages/teacher/ExamMonitoring'
+import TeacherAIExamCreate from '../pages/teacher/TeacherAIExamCreate'
 import Layout from '../components/Layout'
 
 export default function TeacherLayout() {
@@ -23,9 +24,9 @@ export default function TeacherLayout() {
         <Route path="/exams/:id/results/:attemptId" element={<StudentExamDetail />} />
         <Route path="/exams/:id/monitoring" element={<ExamMonitoring />} />
         <Route path="/exams/:id/preview" element={<ExamPreview />} />
+        <Route path="/ai-create" element={<TeacherAIExamCreate />} />
         <Route path="*" element={<Navigate to="/teacher" replace />} />
       </Routes>
     </Layout>
   )
 }
-
