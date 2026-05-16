@@ -6,7 +6,7 @@ import { examApi } from '../../lib/api/exams'
 import { aiEditQuestion } from '../../lib/api/gemini'
 import { getMyBanks, getBankQuestions, getRandomQuestions, getOrCreateBank, addQuestionsToBank, generateShareCode, importBankByShareCode, removeQuestionFromBank, type QuestionBank, type BankQuestion } from '../../lib/api/question-bank'
 import toast from 'react-hot-toast'
-import { Sparkles, Database, RefreshCw, Send, Loader2, Copy, Download, Trash2, Eye, EyeOff, X, ChevronDown, ChevronUp, Wand2 } from 'lucide-react'
+import { Sparkles, Database, RefreshCw, Send, Loader2, Copy, Download, Trash2, Eye, EyeOff, X, Wand2 } from 'lucide-react'
 import LoadingSpinner from '../../components/LoadingSpinner'
 
 export default function TeacherAIExamCreate() {
